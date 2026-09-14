@@ -2,7 +2,7 @@
 #include <stdint.h>
 
 // Input must already be debounced. Short presses are emitted on release so a
-// pairing hold cannot also send Capture/Touchpad to the host.
+// GP20 pairing hold cannot also send Guide to the host.
 class SyncButton {
 public:
   bool update(bool pressed, uint32_t now, bool suppress = false) {

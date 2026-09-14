@@ -17,7 +17,7 @@ The current sketch is a prototype, not a verified release. Exact-target compilat
 - Keep Wi-Fi configuration and Bluetooth play as separate boot modes.
 - Prioritize the web wiring tester for the user's button rewiring: show every physical GPIO before remapping/SOCD/turbo, including Special and Sync, with live highlights and no configuration writes. Resume native transport work after this addition.
 - Reserve GP14 for local control. It must not be a normal remap destination.
-- GP21 held for three seconds toggles Bluetooth sync/discovery (user update 2026-09-09). Short presses produce mapped Capture on release; long holds suppress that host input. Keep existing bonds and known-host reconnect available. Hardware pairing checks are SYNC-01.
+- GP20 held for three seconds toggles Bluetooth sync/discovery (user update 2026-09-09). Short presses produce mapped Guide on release; long holds suppress that host input. Keep existing bonds and known-host reconnect available. Hardware pairing checks are SYNC-01.
 - Keep the existing three shared profiles only during baseline stabilization. The requested end state is multiple independent profiles per output mode.
 - Keep the existing EEPROM layout for the first validation fix. Versioning, migration, integrity checks, and write recovery belong in the storage milestone.
 - Do not select a merely similar board definition. Verify the exact board/radio variant before compiling or flashing.

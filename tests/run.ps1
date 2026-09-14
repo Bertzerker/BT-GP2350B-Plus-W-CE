@@ -9,7 +9,7 @@ if (!$installation) { throw 'Visual Studio C++ build tools were not found.' }
 $vcvars = Join-Path $installation 'VC/Auxiliary/Build/vcvars64.bat'
 Push-Location $buildDirectory
 try {
-    foreach ($test in @('config_test', 'portal_test', 'sync_test', 'input_test', 'gamepad_test', 'reconnect_test')) {
+    foreach ($test in @('config_test', 'portal_test', 'sync_test', 'input_test', 'gamepad_test', 'reconnect_test', 'boot_test', 'display_test')) {
         $source = Join-Path $PSScriptRoot "$test.cpp"
         $includes = Join-Path $PSScriptRoot 'stubs'
         $command = 'call "' + $vcvars + '" >nul && cl /nologo /EHsc /W4 /WX /utf-8 /std:c++14 /I"' + $includes + '" "' + $source + '" /Fe:' + $test + '.exe && ' + $test + '.exe'

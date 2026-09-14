@@ -95,11 +95,20 @@ int main() {
   assert(!bounds.scan());
   assert(bounds.config.profiles[0].turboHz == 2 && bounds.config.profiles[0].turboMask == 0);
   assert(bounds.output() == 0); // A clamped speed chord must not toggle turbo instead.
+  Rig sync;
+  sync.keys[IN_GUIDE] = true;
+  sync.scan(false); assert(!sync.down(IN_GUIDE)); // GP20 hold is withheld.
+  sync.keys[IN_GUIDE] = false;
+  sync.scan(true); assert(sync.down(IN_GUIDE));
+  sync.scan(false); assert(!sync.down(IN_GUIDE));
+  sync.keys[IN_SPECIAL] = true;
+  sync.scan(true); assert(!sync.down(IN_GUIDE));
   Rig capture;
-  capture.scan(true); assert(capture.down(IN_CAPTURE));
-  capture.scan(false); assert(!capture.down(IN_CAPTURE));
-  capture.keys[IN_SPECIAL] = true;
-  capture.scan(true); assert(!capture.down(IN_CAPTURE));
+  capture.keys[IN_CAPTURE] = true;
+  capture.scan(); assert(capture.down(IN_CAPTURE)); // GP21 is an ordinary held input again.
+  capture.scan(); assert(capture.down(IN_CAPTURE));
+  capture.keys[IN_CAPTURE] = false;
+  capture.scan(); assert(!capture.down(IN_CAPTURE));
 
   Rig reset(SOCD_LAST_INPUT);
   reset.keys[IN_UP] = true; reset.scan();

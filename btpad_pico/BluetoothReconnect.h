@@ -32,7 +32,7 @@ void reconnectBluetooth() {
     ++count;
   }
   gap_link_key_iterator_done(&iterator);
-  if (!found) return; // Pairing remains a physical GP21 action.
+  if (!found) return; // Pairing remains a physical GP20 action.
   nextHost = (nextHost < count ? nextHost + 1 : 1) % count;
   uint16_t cid = 0;
   const uint8_t status = hid_device_connect(selected, &cid);

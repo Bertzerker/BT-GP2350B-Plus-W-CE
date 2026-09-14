@@ -2,7 +2,7 @@
 
 Bluetooth controller firmware for the **Waveshare RP2350B-Plus-W**, built with Arduino-Pico. It supports wired buttons and a digital joystick, Bluetooth gamepad/keyboard output, a Wi-Fi configuration page with a live wiring tester, and an optional SSD1306 OLED.
 
-**Status: working development prototype, updated 2026-09-14.** The latest no-OLED firmware has been flashed and its startup verified. The newest Generic HID and automatic reconnect changes still need host testing.
+**Status: working development prototype, updated 2026-09-14.** The OLED firmware with the new layout and GP20 sync/boot selector has been flashed and its startup verified. Physical display and shortcut checks remain pending. Generic HID and automatic reconnect changes also still need host testing.
 
 ## Current support
 
@@ -11,7 +11,7 @@ Bluetooth controller firmware for the **Waveshare RP2350B-Plus-W**, built with A
 | DirectInput | User confirmed normal operation; its existing output behavior is preserved. |
 | Generic HID | Eight-direction POV hat and independent Z/Rz triggers without duplicate trigger buttons. Desktop tests pass; latest Windows/MiSTer checks pending. |
 | Keyboard | Implemented with shared input processing; full hardware validation pending. |
-| Bluetooth sync | Hold GP21 for 3 seconds to toggle pairing/discovery. Basic pairing has been confirmed. |
+| Bluetooth sync | Hold GP20 for 3 seconds to toggle pairing/discovery. Basic pairing has been confirmed. |
 | Automatic reconnect | Saved-host attempts added, with at least 10 seconds between idle attempts. Desktop tests pass; power-cycle reconnect unverified. |
 | Web setup | Password/default-mode changes smoke-tested; live GPIO wiring tester confirmed working by the user. |
 | Profiles and input processing | Three shared profiles, remapping, turbo and SOCD implemented with desktop tests. Broader persistence/input hardware checks pending. |
@@ -27,9 +27,13 @@ The inputs are digital switches, so trigger axes have only released and fully pr
 2. Hold **GP14 at power-on** to enter setup. Connect to **BTPad-Setup** and open **http://192.168.4.1/**.
 3. On a fresh configuration, the Wi-Fi and admin password is **`changeme`**. Replace it when prompted. An existing saved password remains in use; Wi-Fi adopts a changed password on the next restart.
 4. Use **Live wiring test** to see GPIO labels light up while inputs are held. Choose the default mode and restart with no buttons held.
-5. Hold **GP21 for 3 seconds** to enable Bluetooth sync and pair from the host. Release before using another long hold to toggle sync off.
+5. Hold **GP20 for 3 seconds** to enable Bluetooth sync and pair from the host. Release before using another long hold to toggle sync off.
 
 Boot overrides: **GP06 = Generic HID**, **GP09 = Keyboard**, **GP14 = setup**. DirectInput is selected through the saved default. Wi-Fi setup and Bluetooth play run in separate boot modes.
+
+**Hold GP20 at power-on to enter USB firmware flashing mode.** This takes priority over all boot overrides. In normal play, GP20 short taps send Guide and a three-second hold toggles sync; GP21 is an ordinary Capture input. The new boot shortcut becomes available only after installing this update.
+
+With the display fitted, use the **`-WithDisplay`** build. Its GP2040-CE-inspired screen shows mode, Bluetooth status, profile, live D-pad/buttons, turbo rings/rate and SOCD; setup mode shows the Wi-Fi name and URL. The expected display remains a 128×64 SSD1306 at `0x3C` on GP00/GP01. Hardware display and GP20 boot/sync checks remain pending.
 
 After the latest update, test Generic HID's POV directions and trigger isolation, then pair once and power-cycle without sync to test reconnect. Redefine the controller inputs on MiSTer after changing direction-report behavior.
 
@@ -42,7 +46,7 @@ Requires Arduino CLI (tested with 1.2.0). The build script installs pinned depen
 ./build.ps1                          # Subsequent no-OLED build
 ./build.ps1 -Install -WithDisplay     # Install OLED dependencies and build with OLED
 ./build.ps1 -WithDisplay             # Subsequent OLED build
-./tests/run.ps1                      # Six C++ suites; Visual Studio C++ tools required
+./tests/run.ps1                      # Eight C++ suites; Visual Studio C++ tools required
 node tests/wiring_test.cjs           # Wiring-page script tests; Node.js required
 ```
 
@@ -50,7 +54,7 @@ Pinned target: Arduino-Pico **6.1.0**, `waveshare_rp2350b_plus_w`, ARM at 150 MH
 
 Outputs are `.build/headless/btpad_pico.ino.uf2` and `.build/display/btpad_pico.ino.uf2`. Enter BOOTSEL and copy the appropriate UF2 to the RP2350 boot drive. The build script does not flash automatically.
 
-Both firmware variants and all six C++ suites pass for the current implementation. Wiring-script tests also passed for the wiring-tester addition. The latest headless image was flashed successfully and returned live serial diagnostics. Detailed hashes, measurements and remaining physical tests are recorded in [VALIDATION.md](VALIDATION.md).
+All eight C++ suites and the wiring-script tests pass for the current implementation. Both display and headless builds pass; see [VALIDATION.md](VALIDATION.md) for exact build and flash records. The OLED image was flashed successfully and returned live serial diagnostics; physical OLED/GP20 behavior still requires user verification.
 
 ## Known limitations and next work
 

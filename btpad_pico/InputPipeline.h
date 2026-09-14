@@ -5,7 +5,7 @@ class InputPipeline {
 public:
   // Called for every debounced scan, not just transmitted reports, so direction
   // order is retained even when two edges fall between reports.
-  bool scan(const bool physical[IN_COUNT], Config &config, bool capturePulse) {
+  bool scan(const bool physical[IN_COUNT], Config &config, bool syncPulse) {
     bool eligible[IN_COUNT] = {};
     for (uint8_t i = 0; i < IN_COUNT; ++i) {
       if (!physical[i]) blocked[i] = false;
@@ -51,7 +51,7 @@ public:
     accepted = 0;
     for (uint8_t i = 0; i < IN_COUNT; ++i) {
       if (i == IN_SPECIAL) continue;
-      bool down = i == IN_CAPTURE ? capturePulse : physical[i];
+      bool down = i == IN_GUIDE ? syncPulse : physical[i];
       if (down && !blocked[i] && !physical[IN_SPECIAL]) accepted |= 1u << i;
     }
     const Profile &profile = config.profiles[config.activeProfile];

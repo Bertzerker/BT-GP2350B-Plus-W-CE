@@ -6,7 +6,7 @@ Bluetooth HID controller firmware prototype for the Waveshare RP2350B-Plus-W, ba
 
 Development order and acceptance gates are in [DEVELOPMENT_PLAN.md](../DEVELOPMENT_PLAN.md); current work is tracked in [TASKS.md](../TASKS.md).
 
-As of 2026-09-14, all six desktop suites pass, including Generic HID report encoding and saved-host reconnect scheduling. Both firmware builds pass and the latest no-OLED image was flashed with startup verified. The wiring tester and normal DirectInput were confirmed by the user; the latest Generic HID and reconnect changes still need host testing. See [VALIDATION.md](../VALIDATION.md).
+As of 2026-09-14, all eight desktop suites pass, including GP20 boot selection, input routing and OLED bounds. Both builds pass. The OLED/GP20 image was flashed with startup verified; physical display and shortcut checks remain pending. The wiring tester and normal DirectInput were confirmed by the user; Generic HID and reconnect changes still need host testing. See [VALIDATION.md](../VALIDATION.md).
 
 ## Hardware Target
 
@@ -23,7 +23,7 @@ Saved defaults for unimplemented/removed modes migrate to Generic HID without re
 
 Generic HID sends directions through a real eight-direction POV hat; X/Y remain centered. LT and RT drive independent Z and Rz axes without duplicate button 7/8 presses. Their released value is the axis minimum, even with no switch connected; this is not a low GPIO reading. Digital switches only provide released/fully pressed endpoints. DirectInput retains its user-verified legacy X/Y directions and trigger axis/button reports. Guide remains ordinary button 13; native Game Bar/Steam Guide behavior is not implemented.
 
-Outside sync mode, the controller stays connectable and tries saved Bluetooth hosts in turn, at intervals of at least 10 seconds while idle. It avoids starting an attempt while the stack already has an active or pending connection. New pairing still requires GP21 held for three seconds. The pinned core stores bonds in its firmware flash area: reflashing can erase bonds, so pair again after an update before testing reconnection across ordinary power cycles.
+Outside sync mode, the controller stays connectable and tries saved Bluetooth hosts in turn, at intervals of at least 10 seconds while idle. It avoids starting an attempt while the stack already has an active or pending connection. New pairing still requires GP20 held for three seconds. The pinned core stores bonds in its firmware flash area: reflashing can erase bonds, so pair again after an update before testing reconnection across ordinary power cycles.
 
 For MiSTer, use Generic HID's hat and rerun **Define joystick buttons** after updating the output behavior. Physical MiSTer compatibility and reconnect behavior still require testing. See the [MiSTer controller setup instructions](https://mister-devel.github.io/MkDocs_MiSTer/setup/controller/).
 
@@ -33,7 +33,7 @@ The mapping table below retains the desired labels for future XInput, Switch and
 
 ### Live wiring test
 
-Hold GP14 while powering on, connect to **BTPad-Setup**, open **http://192.168.4.1/** and sign in. The **Live wiring test** at the top shows all 19 inputs, including GP14 Special and GP21 Capture/Sync. Hold a button or move the joystick: its GPIO badge turns green and reads **Pressed**, both in the tester and mapping table. Release it to clear the highlight.
+Hold GP14 while powering on, connect to **BTPad-Setup**, open **http://192.168.4.1/** and sign in. The **Live wiring test** at the top shows all 19 inputs, including GP14 Special, GP20 Guide/Sync and GP21 Capture. Hold a button or move the joystick: its GPIO badge turns green and reads **Pressed**, both in the tester and mapping table. Release it to clear the highlight.
 
 This reads debounced physical pins before remapping, SOCD and turbo; opposite directions and multiple buttons remain visible together. Setup mode does not run Special/Sync shortcuts, and testing does not save settings. Updates arrive roughly every 100 ms; hold very short taps a little longer. Connection failures clear the highlights and retry; an expired session asks you to sign in again. JavaScript must be enabled.
 
@@ -83,15 +83,17 @@ GP14 is the special/profile/turbo button.
 - Hold Special + Right: increase turbo speed
 - Hold Special + any game button: toggle turbo for that physical button
 
-Press Special first, then the shortcut input. One action is allowed per Special hold; priority is Up, Down, Left, Right, then the first held game button in GPIO-map order. All inputs held during Special are suppressed individually until released, including after Special is released. Inputs already sent before Special was pressed cannot be withdrawn. A speed shortcut at the 2/30 Hz limit is consumed without changing another setting. GP21 sync/taps are also suppressed if they belong to a Special gesture.
+Press Special first, then the shortcut input. One action is allowed per Special hold; priority is Up, Down, Left, Right, then the first held game button in GPIO-map order. All inputs held during Special are suppressed individually until released, including after Special is released. Inputs already sent before Special was pressed cannot be withdrawn. A speed shortcut at the 2/30 Hz limit is consumed without changing another setting. GP20 sync/taps are also suppressed if they belong to a Special gesture.
 
 ## Bluetooth sync
 
-Hold GP21 for three seconds to toggle Bluetooth sync on/off in either gamepad or keyboard mode. One hold triggers once; release before toggling again. Sync starts off after boot. Enabling it makes the device discoverable, enables bonding and automatic Just Works confirmation, and disconnects the current HID connection so another host can pair. Disabling it turns off discovery and new bonding/automatic confirmation. Existing bonds are retained for known-host reconnection.
+Hold GP20 for three seconds to toggle Bluetooth sync on/off in either gamepad or keyboard mode. One hold triggers once; release before toggling again. Sync starts off after boot. Enabling it makes the device discoverable, enables bonding and automatic Just Works confirmation, and disconnects the current HID connection so another host can pair. Disabling it turns off discovery and new bonding/automatic confirmation. Existing bonds are retained for known-host reconnection.
 
 The pairing fix advertises only the selected gamepad or keyboard descriptor, avoiding overflow in Arduino-Pico's fixed service-record buffer. If Windows retained an entry from the earlier firmware, remove that BTPad entry before retrying pairing. USB serial at 115200 baud reports sync, connection, pairing and authentication status once per second (`0xff` means no result yet; `0x00` means success).
 
-A short GP21 press produces its mapped Capture input on release, for one report. A long hold produces no Capture input. This means holding GP21 no longer holds the host button down. The OLED shows `BT Sync ON/OFF`. GP21 sync is inactive in WLAN setup mode. Pairing and reconnect behavior still require testing on the board.
+A short GP20 press produces its mapped Guide input on release, for one report. A long hold produces no Guide input. GP21 is now an ordinary held Capture input. GP20 sync is inactive in WLAN setup mode. Pairing and reconnect behavior still require testing on the board.
+
+Hold GP20 while plugging in or restarting the board to enter the RP2350 ROM USB flashing mode. It takes priority over other boot shortcuts and runs before display, storage or Bluetooth initialization. Release it once the boot drive appears and copy the UF2. During normal play a GP20 hold only toggles Bluetooth sync. Until firmware containing this shortcut has been installed, use the board's physical BOOTSEL button.
 
 ## WLAN Setup Portal
 
@@ -136,7 +138,7 @@ The display build enables a 128x64 SSD1306 at address `0x3C`; the default script
 - SDA: GP00
 - SCL: GP01
 
-It shows live direction state, button bitfield, turbo speed, active mode, active profile, and Bluetooth sync status.
+The original fixed layout is inspired by [GP2040-CE's OLED display](https://gp2040-ce.info/web-configurator/menu-pages/display-configuration/): mode and Bluetooth connection/sync status, profile number/name, a D-pad and eight main buttons that fill when pressed, auxiliary input indicators, turbo rings, turbo rate, SOCD and direction-output mode. It shows physical inputs before remapping/SOCD, including GP20 sync holds. Setup mode shows the access-point name and URL. Updates are limited to one per 100 ms; an absent display at 0x3C is skipped. This is not GP2040-CE's full display configurator, mini-menu, splash or input-history implementation.
 
 ## Build
 

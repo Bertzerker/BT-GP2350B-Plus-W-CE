@@ -38,7 +38,7 @@ Buttons are active-low to ground. The labels below specify target behavior acros
 ## Controls and configuration
 
 1. GP06 selects the working Generic HID mode at boot; GP09 selects Keyboard, GP14 selects WLAN setup. Native-mode boot selections return only when implemented. The original GP06 XInput/DirectInput conflict is superseded by this explicit baseline.
-2. Hold GP21 for 3 seconds to toggle Bluetooth sync. Short taps retain Capture; a sync hold must not emit that host input.
+2. Hold GP20 for 3 seconds to toggle Bluetooth sync. Short taps retain Guide; a sync hold must not emit that host input.
 3. GP14 is Special: Up/Down select profiles, Left/Right change turbo speed, game buttons toggle their turbo. Suppress control gestures through release.
 4. WLAN setup hosts an access point and requires changing the initial password. Each output mode eventually has multiple independent custom profiles, mappings, turbo and SOCD settings.
 5. Support neutral, up-priority and last-input SOCD after remapping, consistently in keyboard and gamepad outputs.

@@ -22,6 +22,7 @@
 #include <JoystickBT.h>
 #include <KeyboardBT.h>
 #include <HID_Bluetooth.h>
+#include <pico/bootrom.h>
 
 #if defined(BTPAD_REQUIRE_DISPLAY) || (!defined(BTPAD_DISABLE_DISPLAY) && __has_include(<Wire.h>) && __has_include(<Adafruit_GFX.h>) && __has_include(<Adafruit_SSD1306.h>))
 #include <Wire.h>
@@ -43,6 +44,8 @@
 #include "InputPipeline.h"
 #include "BluetoothReports.h"
 #include "GamepadOutput.h"
+#include "DisplayUI.h"
+#include "BootControl.h"
 
 const uint8_t KEY_LABELS[IN_COUNT] = {
   KEY_UP_ARROW, KEY_DOWN_ARROW, KEY_RIGHT_ARROW, KEY_LEFT_ARROW,
@@ -70,7 +73,7 @@ bool turboPhase = false;
 uint32_t lastTurboFlipMs = 0;
 SyncButton syncButton;
 bool bluetoothSync = false;
-bool captureTap = false;
+bool syncTap = false;
 static btstack_packet_callback_registration_t pairingEvents;
 static uint8_t pairingStatus = 0xff, authenticationStatus = 0xff;
 
@@ -278,39 +281,28 @@ void updateTurboClock() {
 
 void updateDisplay() {
 #if BTPAD_HAS_DISPLAY
-  if (!displayReady || millis() % 100 > 8) return;
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0, 0);
-  display.print(MODE_NAMES[currentMode]);
-  display.print(" / ");
-  display.println(config.profiles[config.activeProfile].name);
-  display.print("Turbo ");
-  display.print(config.profiles[config.activeProfile].turboHz);
-  display.println("Hz");
-  display.print("U");
-  display.print(pressed(IN_UP));
-  display.print(" D");
-  display.print(pressed(IN_DOWN));
-  display.print(" L");
-  display.print(pressed(IN_LEFT));
-  display.print(" R");
-  display.println(pressed(IN_RIGHT));
-  display.print("Btns ");
-  display.println(buildButtons(), HEX);
-  display.print("BT Sync ");
-  display.println(bluetoothSync ? "ON" : "OFF");
+  static uint32_t lastFrame = 0;
+  const uint32_t now = millis();
+  if (!displayReady || static_cast<uint32_t>(now - lastFrame) < 100) return;
+  lastFrame = now;
+  uint32_t physical = 0;
+  for (uint8_t i = 0; i < IN_COUNT; ++i) if (stableState[i]) physical |= 1u << i;
+  bool connected = false;
+  if (currentMode != MODE_WEB) {
+    BluetoothLock lock;
+    connected = PicoBluetoothHID.connected();
+  }
+  drawControllerDisplay(display, config, currentMode, physical, bluetoothSync, connected);
   display.display();
 #endif
 }
-
 void setupDisplay() {
 #if BTPAD_HAS_DISPLAY
   Wire.setSDA(0);
   Wire.setSCL(1);
   Wire.begin();
-  displayReady = display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  Wire.beginTransmission(0x3C);
+  displayReady = Wire.endTransmission() == 0 && display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   if (displayReady) {
     display.clearDisplay();
     display.display();
@@ -319,6 +311,7 @@ void setupDisplay() {
 }
 
 void setup() {
+  checkFirmwareBoot();
   Serial.begin(115200);
   loadConfig();
   initInputs();
@@ -343,13 +336,13 @@ void loop() {
     return;
   }
 
-  if (syncButton.update(pressed(IN_CAPTURE), millis(),
-                        pressed(IN_SPECIAL) || inputPipeline.suppressed(IN_CAPTURE))) {
+  if (syncButton.update(pressed(IN_GUIDE), millis(),
+                        pressed(IN_SPECIAL) || inputPipeline.suppressed(IN_GUIDE))) {
     setBluetoothSync(!bluetoothSync);
   }
   bool reportDue = static_cast<uint32_t>(millis() - lastReportMs) >= REPORT_MS;
-  if (reportDue) captureTap = syncButton.takeTap();
-  if (inputPipeline.scan(stableState, config, captureTap)) saveConfig();
+  if (reportDue) syncTap = syncButton.takeTap();
+  if (inputPipeline.scan(stableState, config, syncTap)) saveConfig();
   updateTurboClock();
   logicalState = inputPipeline.report(config.profiles[config.activeProfile], turboPhase);
   if (reportDue) {

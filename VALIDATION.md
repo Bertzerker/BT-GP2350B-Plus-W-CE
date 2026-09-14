@@ -110,3 +110,17 @@ Device checks: pair once after flash, select Generic HID, verify the Windows POV
 OLED build also passes: 523288 bytes program, 96376 bytes static RAM; SHA256 `2FA33996837C0B5C91850F2128B15553B59F8D01D320C561C2A4683470CBE980`. Log: `.build/compile-reconnect-display.log`.
 
 2026-09-14 flash completed after the user reconnected the board. Verified RP2350 bootloader identity on I: and headless SHA256 `9F903859128C22C7066C05D21255A9BAD69A02F526BE149C5087094889C5B86D`, then copied the image successfully. COM10 returned with two live `BT sync=0 connected=0 pairing=0xff auth=0xff` diagnostic lines. Firmware startup is confirmed; host input and automatic reconnect still require physical testing.
+
+## OLED and GP20 update — 2026-09-14
+
+Runtime sync moved from GP21 to GP20 (three seconds); Guide emits only on short release. GP21 now remains active while held as normal Capture. GP20 sampled low at startup enters the RP2350 ROM USB loader before storage, display or Bluetooth initialization. This entry path is only called from setup; a runtime hold cannot flash/reboot. Existing EEPROM IDs and mappings are unchanged.
+
+The SSD1306 display now uses an original fixed layout inspired by [GP2040-CE display functions](https://gp2040-ce.info/web-configurator/menu-pages/display-configuration/): mode, profile, Bluetooth status, physical D-pad and eight main inputs, seven auxiliary indicators, turbo rings/rate and SOCD. Setup mode gives AP and URL. Frames are limited by elapsed time to 10 Hz; I2C address 0x3C is probed before initialization. Full frame transfer remains synchronous, so actual input latency with OLED still needs measurement. The GP2040-CE mini-menu, configurable layouts, splash and history are not implemented.
+
+All eight C++ suites plus the wiring-script suite pass. New tests cover GP20 startup samples, short/long/suppressed runtime gestures, Guide pulse routing, ordinary GP21 holds, and text/shape bounds for all supported OLED modes, longest profile, turbo rings and all 19 physical inputs.
+
+OLED build: 524696 bytes program, 96380 bytes static RAM. UF2 SHA256 `5D2A69F2E557A0DC45098166AABE318297E22D012BC6D2D5581B7F132F2476CC`. Log `.build/compile-gp20-display.log`. Board was absent; flashing and physical OLED/boot/sync tests pending. Use the physical BOOTSEL button for this first update, then verify GP20 held on power-up presents the RP2350 drive; also verify normal boot, runtime three-second sync, short Guide, GP21 held input and GP14 web mode.
+
+Headless build also passes: 510500 bytes program, 96092 bytes static RAM. SHA256 `39301EB8E1661C4713D82E2FF83F48D7AA99B87C3E26C32015E19DC40D7BEC57`. Log `.build/compile-gp20-headless.log`. Use the OLED image for the user's now-fitted display.
+
+After the user connected the board, verified RP2350 bootloader identity on I: and OLED SHA256 `5D2A69F2E557A0DC45098166AABE318297E22D012BC6D2D5581B7F132F2476CC`, then copied the OLED UF2 successfully. COM10 returned with two live `BT sync=0 connected=0 pairing=0xff auth=0xff` diagnostic lines. Startup is confirmed; OLED appearance, GP20 physical boot/sync actions and GP21 behavior still require user checks.

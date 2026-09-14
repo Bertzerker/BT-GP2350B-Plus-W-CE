@@ -35,5 +35,5 @@ int main() {
   assert(!suppressed.update(true, 6000));
   assert(!suppressed.update(false, 6100));
   assert(suppressed.takeTap());
-  puts("GP21 sync hold tests passed.");
+  puts("GP20 sync hold tests passed.");
 }
