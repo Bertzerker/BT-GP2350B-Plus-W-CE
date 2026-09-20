@@ -3,6 +3,11 @@
 // Same-origin external script keeps executable inline content out of the portal.
 const char WIRING_TEST_JS[] = R"JS(
 (() => {
+  const options = document.getElementById('key-options');
+  if (options) document.querySelectorAll('select[data-key]').forEach(select => {
+    select.appendChild(options.content.cloneNode(true));
+    select.value = select.dataset.key;
+  });
   const status = document.getElementById('wiring-status');
   const pins = Array.from(document.querySelectorAll('[data-input]'));
   function display(mask) {

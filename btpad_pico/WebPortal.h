@@ -1,6 +1,8 @@
 #pragma once
 #include <pico/rand.h>
 #include "WiringTest.h"
+#include "PortalStyle.h"
+#include "WebAssets.h"
 
 // One administrator session; tokens are regenerated at login and password change.
 String loginCsrf, sessionToken, sessionCsrf;
@@ -49,7 +51,7 @@ void portalHeaders() {
   server.sendHeader("Cache-Control", "no-store");
   server.sendHeader("X-Content-Type-Options", "nosniff");
   server.sendHeader("Referrer-Policy", "no-referrer");
-  server.sendHeader("Content-Security-Policy", "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
+  server.sendHeader("Content-Security-Policy", "default-src 'none'; img-src 'self'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
 }
 
 void portalRedirect() {
@@ -90,14 +92,9 @@ bool requireWrite(bool allowInitialSetup = false) {
 }
 
 String pageStart() {
-  return F("<!doctype html><html lang=en><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
-           "<title>BTPad setup</title><style>body{font-family:system-ui;margin:24px;max-width:760px}"
-           "label{display:block;margin:12px 0}input,select,button{font:inherit;padding:8px}"
-           "td,th{padding:6px;text-align:left}.pins{display:flex;flex-wrap:wrap;gap:8px}"
-           ".pin{display:inline-block;padding:8px;border:2px solid #777;border-radius:8px;background:#f3f3f3;color:#222}"
-           ".pin.pressed{background:#176b38;color:white;border-color:#124f2a}"
-           ".pin-state{display:block;font-size:.75em}.wiring{padding:16px;border:1px solid #aaa;border-radius:12px}"
-           "</style><h1>BTPad setup</h1>");
+  return String(F("<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
+           "<title>BTPad setup</title><link rel=icon type=image/png href=/favicon.png><style>")) + PORTAL_STYLE +
+           "</style></head><body><main><h1><img src=/favicon.png alt='' width=44 height=44>BTPad setup</h1>";
 }
 
 String pinBadge(const PinDef &pin) {
@@ -119,22 +116,23 @@ String passwordForm() {
 String htmlPage(uint8_t editProfile) {
   const Profile &profile = config.profiles[editProfile];
   String page = pageStart();
-  page += "<section class=wiring><h2>Live wiring test</h2>"
-      "<p>Hold a button or move the joystick to light up its GPIO. These are physical inputs, before remapping, SOCD or turbo. "
-      "Special and Sync can be tested here without triggering their shortcuts. No settings are saved by this test.</p>"
-      "<p id=wiring-status role=status>Connecting to the controller…</p><noscript>Enable JavaScript to see live inputs.</noscript><div class=pins>";
-  for (const PinDef &pin : PIN_MAP) page += pinBadge(pin);
-  page += "</div></section><script src=/wiring-test.js defer></script>";
-  page += "<p>Generic HID and DirectInput use standard Bluetooth HID. Native XInput, Switch and PS3 are not implemented. Guide is an ordinary gamepad button.</p>";
+  page += "<script src=/wiring-test.js defer></script>";
+  page += "<p class=hint>Gamepad profiles use shared logical buttons across output modes. Xbox BLE is experimental and needs Windows XInput verification; PS3 USB is experimental. Xbox consoles, Switch and PS3 Bluetooth are not supported.</p>";
+  page += "<p class=hint>Startup: GP06 Generic HID, GP08 PS3 USB, GP09 Keyboard, GP10 Xbox BLE, GP11 DirectInput. GP14 setup; GP20 flashing. GP07 is reserved for future Switch support.</p>";
   page += "<form method=get action=/><label>Edit profile<select name=edit>";
   for (uint8_t i = 0; i < 3; ++i) {
+    if (!profileExists(config, i)) continue;
     page += "<option value='" + String(i) + "'" + (i == editProfile ? " selected" : "") + ">" + escapeHtml(config.profiles[i].name) + "</option>";
   }
   page += "</select></label><button>Load profile</button></form>";
+  page += "<p class=hint>Up to three saved profiles. Delete an unused profile to free a slot.</p><form method=post action=/profile/new>" + csrfField(sessionCsrf);
+  page += "<label>New profile name<input name=name maxlength=19 required></label><button>Create profile</button></form>";
+  page += "<form method=post action=/profile/delete>" + csrfField(sessionCsrf) + "<input type=hidden name=profile value='" + String(editProfile) + "'><label><input type=checkbox name=confirm required>Delete this profile and its keyboard map</label><button>Delete profile</button></form>";
+
   page += "<form method=post action=/save>" + csrfField(sessionCsrf);
   page += "<input type=hidden name=profile value='" + String(editProfile) + "'>";
   page += "<label>Default mode<select name=mode>";
-  for (uint8_t i = 0; i < MODE_WEB; ++i) {
+  for (uint8_t i = 0; i <= MODE_XBOX_BLE; ++i) {
     if (!isSelectableMode(static_cast<HidMode>(i))) continue;
     page += "<option value='" + String(i) + "'" + (i == config.defaultMode ? " selected" : "") + ">" + MODE_NAMES[i] + "</option>";
   }
@@ -146,23 +144,37 @@ String htmlPage(uint8_t editProfile) {
   for (uint8_t i = 0; i < 3; ++i) {
     page += "<option value='" + String(i) + "'" + (i == profile.socd ? " selected" : "") + ">" + names[i] + "</option>";
   }
-  page += "</select></label><table><tr><th>Physical input</th><th>Maps to</th><th>Turbo</th></tr>";
+  page += "</select></label><h2>Profile mapper</h2><p class=hint>Press an input to highlight its GPIO below. Testing shows physical wiring and does not save settings.</p>"
+      "<p id=wiring-status role=status>Connecting to the controller…</p><noscript>Enable JavaScript to see live inputs.</noscript>"
+      "<table><thead><tr><th scope=col>GPIO</th><th scope=col>Maps to</th><th scope=col>Turbo</th></tr></thead><tbody>";
   for (const PinDef &pin : PIN_MAP) {
-    if (pin.id == IN_SPECIAL) continue;
-    page += "<tr><td>" + pinBadge(pin) + "</td><td><select name=map" + String(pin.id) + ">";
+    if (pin.id == IN_SPECIAL) {
+      page += "<tr><td>" + pinBadge(pin) + "</td><td class=fixed>Special (fixed)</td><td>—</td></tr>";
+      continue;
+    }
+    page += "<tr><td>" + pinBadge(pin) + "</td><td><select aria-label='Map GP" + String(pin.gpio) + "' name=map" + String(pin.id) + ">";
     for (uint8_t target = 0; target < IN_COUNT; ++target) {
       if (target == IN_SPECIAL) continue;
-      page += "<option value='" + String(target) + "'" + (profile.remap[pin.id] == target ? " selected" : "") + ">" + MODE_LABELS[config.defaultMode].labels[target] + "</option>";
+      page += "<option value='" + String(target) + "'" + (profile.remap[pin.id] == target ? " selected" : "") + ">" + LOGICAL_LABELS[target] + "</option>";
     }
     page += "</select></td><td>";
-    if (pin.id >= IN_A && pin.id <= IN_RS) {
-      page += "<input type=checkbox name=turbo" + String(pin.id) + ((profile.turboMask & (1u << pin.id)) ? " checked" : "") + ">";
+    if (pin.id >= IN_SOUTH && pin.id <= IN_RS) {
+      page += "<label><input type=checkbox aria-label='Turbo GP" + String(pin.gpio) + "' name=turbo" + String(pin.id) + ((profile.turboMask & (1u << pin.id)) ? " checked" : "") + "></label>";
     }
     page += "</td></tr>";
   }
-  page += "</table><button>Save settings</button></form><p>Restart to use the selected default mode.</p>";
+  page += "</tbody></table><button>Save settings</button></form><p>Restart to use the selected default mode.</p>";
+  page += "<details><summary>Keyboard mapper for this profile</summary><p>Independent physical GPIO to keyboard keys. Gamepad remapping does not change this map. Key names refer to physical keyboard positions; characters follow the host keyboard layout. Up to six ordinary keys plus modifiers at once.</p>";
+  page += "<template id=key-options>";
+  for (const auto &key : KEY_OPTIONS) page += "<option value='" + String(key.usage) + "'>" + escapeHtml(key.name) + "</option>";
+  page += "</template><form method=post action=/keyboard>" + csrfField(sessionCsrf) + "<input type=hidden name=profile value='" + String(editProfile) + "'>";
+  for (const PinDef &pin : PIN_MAP) {
+    if (pin.id == IN_SPECIAL) continue;
+    page += "<label>GP" + String(pin.gpio) + " " + pin.name + "<select required data-key='" + String(keyboardConfig.maps[editProfile][pin.id]) + "' name=key" + String(pin.id) + "></select></label>";
+  }
+  page += "<noscript>Enable JavaScript to choose keyboard keys.</noscript><button>Save keyboard map</button></form></details>";
   page += passwordForm();
-  page += "<form method=post action=/logout>" + csrfField(sessionCsrf) + "<button>Sign out</button></form></html>";
+  page += "<form method=post action=/logout>" + csrfField(sessionCsrf) + "<button>Sign out</button></form></main></body></html>";
   return page;
 }
 
@@ -171,6 +183,14 @@ void startWebConfig() {
   WiFi.mode(WIFI_AP);
   WiFi.softAP("BTPad-Setup", config.adminPassword);
   server.collectHeaders("Cookie");
+  server.on("/favicon.png", HTTP_GET, []() {
+    portalHeaders();
+    server.send_P(200, "image/png", reinterpret_cast<const char *>(PORTAL_ICON), sizeof(PORTAL_ICON));
+  });
+  server.on("/background.jpg", HTTP_GET, []() {
+    portalHeaders();
+    server.send_P(200, "image/jpeg", reinterpret_cast<const char *>(PORTAL_BACKGROUND), sizeof(PORTAL_BACKGROUND));
+  });
   server.on("/wiring-test.js", HTTP_GET, []() {
     portalHeaders();
     server.send(200, "application/javascript", WIRING_TEST_JS);
@@ -189,17 +209,18 @@ void startWebConfig() {
     portalHeaders();
     if (!authorized()) {
       server.send(200, "text/html", pageStart() + "<form method=post action=/login>" + csrfField(loginCsrf) +
-          "<label>Password<input type=password name=pw required autocomplete=current-password></label><button>Sign in</button></form></html>");
+          "<label>Password<input type=password name=pw required autocomplete=current-password></label><button>Sign in</button></form></main></body></html>");
       return;
     }
     if (needsPasswordChange()) {
-      server.send(200, "text/html", pageStart() + "<p>Replace the initial password before configuring the controller.</p>" + passwordForm() + "</html>");
+      server.send(200, "text/html", pageStart() + "<p>Replace the initial password before configuring the controller.</p>" + passwordForm() + "</main></body></html>");
       return;
     }
     uint8_t edit = config.activeProfile;
     if (server.hasArg("edit") && !parseNumber(server.arg("edit"), 2, edit)) {
       server.send(400, "text/plain", "Invalid profile."); return;
     }
+    if (!profileExists(config, edit)) { server.send(404, "text/plain", "Profile was deleted."); return; }
     server.send(200, "text/html", htmlPage(edit));
   });
   server.on("/login", HTTP_POST, []() {
@@ -248,8 +269,8 @@ void startWebConfig() {
     if (!requireWrite()) return;
     Config candidate = config;
     uint8_t mode = 0, profileId = 0, turbo = 0, socd = 0;
-    if (!parseNumber(server.arg("mode"), MODE_KEYBOARD, mode) ||
-        !parseNumber(server.arg("profile"), 2, profileId) ||
+    if (!parseNumber(server.arg("mode"), MODE_XBOX_BLE, mode) ||
+        !parseNumber(server.arg("profile"), 2, profileId) || !profileExists(config, profileId) ||
         !parseNumber(server.arg("turbo"), 30, turbo) || turbo < 2 ||
         !parseNumber(server.arg("socd"), SOCD_LAST_INPUT, socd) ||
         server.arg("name").length() == 0 || server.arg("name").length() > 19) {
@@ -270,7 +291,7 @@ void startWebConfig() {
       if (!parseNumber(server.arg("map" + String(pin.id)), IN_COUNT - 1, profile.remap[pin.id])) {
         server.send(400, "text/plain", "Invalid mapping; nothing saved."); return;
       }
-      if (pin.id >= IN_A && pin.id <= IN_RS && server.hasArg("turbo" + String(pin.id))) profile.turboMask |= 1u << pin.id;
+      if (pin.id >= IN_SOUTH && pin.id <= IN_RS && server.hasArg("turbo" + String(pin.id))) profile.turboMask |= 1u << pin.id;
     }
     if (!isConfigValid(candidate)) { server.send(400, "text/plain", "Invalid configuration; nothing saved."); return; }
     Config previous = config;
@@ -280,6 +301,59 @@ void startWebConfig() {
       server.send(500, "text/plain", "Storage write failed; previous settings retained."); return;
     }
     server.sendHeader("Location", "/?edit=" + String(profileId));
+    server.send(303, "text/plain", "");
+  });
+  server.on("/profile/new", HTTP_POST, []() {
+    if (!requireWrite()) return;
+    String name = server.arg("name"); name.trim();
+    if (!name.length() || name.length() > 19) { server.send(400, "text/plain", "Use a name of 1 to 19 characters."); return; }
+    uint8_t slot = 0;
+    while (slot < 3 && profileExists(config, slot)) ++slot;
+    if (slot == 3) { server.send(409, "text/plain", "All three slots are used. Delete an unused profile first."); return; }
+    Config previous = config; KeyboardConfig previousKeys = keyboardConfig;
+    char label[20]; name.toCharArray(label, sizeof(label)); resetProfile(config.profiles[slot], label);
+    KeyboardConfig defaults = defaultKeyboardConfig();
+    memcpy(keyboardConfig.maps[slot], defaults.maps[slot], IN_COUNT);
+    keyboardConfig.checksum = keyboardChecksum(keyboardConfig);
+    if (!saveConfig()) { config = previous; keyboardConfig = previousKeys; server.send(500, "text/plain", "Storage write failed; profile not created."); return; }
+    server.sendHeader("Location", "/?edit=" + String(slot)); server.send(303, "text/plain", "");
+  });
+  server.on("/profile/delete", HTTP_POST, []() {
+    if (!requireWrite()) return;
+    uint8_t slot = 0;
+    if (!server.hasArg("confirm") || !parseNumber(server.arg("profile"), 2, slot) || !profileExists(config, slot)) { server.send(400, "text/plain", "Confirm an existing profile to delete."); return; }
+    uint8_t next = nextProfile(config, slot, true);
+    if (next == slot) { server.send(409, "text/plain", "Keep at least one profile."); return; }
+    Config previous = config; KeyboardConfig previousKeys = keyboardConfig;
+    resetProfile(config.profiles[slot], "");
+    KeyboardConfig defaults = defaultKeyboardConfig();
+    memcpy(keyboardConfig.maps[slot], defaults.maps[slot], IN_COUNT);
+    keyboardConfig.checksum = keyboardChecksum(keyboardConfig);
+    if (config.activeProfile == slot) config.activeProfile = next;
+    if (!saveConfig()) { config = previous; keyboardConfig = previousKeys; server.send(500, "text/plain", "Storage write failed; profile unchanged."); return; }
+    server.sendHeader("Location", "/?edit=" + String(config.activeProfile)); server.send(303, "text/plain", "");
+  });
+  server.on("/keyboard", HTTP_POST, []() {
+    if (!requireWrite()) return;
+    uint8_t slot = 0;
+    if (!parseNumber(server.arg("profile"), 2, slot) || !profileExists(config, slot)) { server.send(400, "text/plain", "Invalid profile."); return; }
+    KeyboardConfig candidate = keyboardConfig;
+    for (uint8_t i = 0; i < IN_COUNT; ++i) {
+      if (i == IN_SPECIAL) continue;
+      uint8_t key = 0;
+      if (!parseNumber(server.arg("key" + String(i)), 231, key) || !validKey(key)) {
+        server.send(400, "text/plain", "Invalid keyboard key; nothing saved."); return;
+      }
+      candidate.maps[slot][i] = key;
+    }
+    candidate.checksum = keyboardChecksum(candidate);
+    KeyboardConfig previous = keyboardConfig;
+    keyboardConfig = candidate;
+    if (!saveConfig()) {
+      keyboardConfig = previous;
+      server.send(500, "text/plain", "Storage write failed; keyboard map unchanged."); return;
+    }
+    server.sendHeader("Location", "/?edit=" + String(slot));
     server.send(303, "text/plain", "");
   });
   server.on("/logout", HTTP_POST, []() {

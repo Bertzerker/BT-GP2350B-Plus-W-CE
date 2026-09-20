@@ -22,13 +22,15 @@ inline GamepadOutput encodeGamepad(uint32_t state, HidMode mode) {
     else if (y > 0) out.hatAngle = x < 0 ? 225 : (x > 0 ? 135 : 180);
     else if (x) out.hatAngle = x < 0 ? 270 : 90;
   }
-  out.z = down(IN_LT) ? 32767 : -32767;
-  out.rz = down(IN_RT) ? 32767 : -32767;
-  const InputId buttons[] = {IN_A, IN_B, IN_X, IN_Y, IN_LB, IN_RB, IN_LT,
-      IN_RT, IN_BACK, IN_START, IN_LS, IN_RS, IN_GUIDE, IN_CAPTURE};
+  out.z = down(IN_L2) ? 32767 : -32767;
+  out.rz = down(IN_R2) ? 32767 : -32767;
+  const InputId buttons[] = {IN_SOUTH, IN_EAST, IN_WEST, IN_NORTH, IN_L1, IN_R1, IN_L2,
+      IN_R2, IN_SELECT, IN_START, IN_LS, IN_RS, IN_GUIDE, IN_CAPTURE};
   for (uint8_t i = 0; i < 14; ++i) {
-    if (mode != MODE_DIRECTINPUT && (buttons[i] == IN_LT || buttons[i] == IN_RT)) continue;
-    if (down(buttons[i])) out.buttons |= 1u << i;
+    if (mode != MODE_DIRECTINPUT && (buttons[i] == IN_L2 || buttons[i] == IN_R2)) continue;
+    uint8_t bit = i;
+    if (mode == MODE_DIRECTINPUT && i < 3) bit = i == 2 ? 0 : i + 1; // btpad.md: West=1, South=2, East=3.
+    if (down(buttons[i])) out.buttons |= 1u << bit;
   }
   return out;
 }

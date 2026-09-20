@@ -5,44 +5,58 @@ class InputPipeline {
 public:
   // Called for every debounced scan, not just transmitted reports, so direction
   // order is retained even when two edges fall between reports.
-  bool scan(const bool physical[IN_COUNT], Config &config, bool syncPulse) {
+  bool scan(const bool physical[IN_COUNT], Config &config, bool syncPulse, bool keyboard = false, bool reportTick = true) {
+    keyboardMode = keyboard;
     bool eligible[IN_COUNT] = {};
     for (uint8_t i = 0; i < IN_COUNT; ++i) {
       if (!physical[i]) blocked[i] = false;
       eligible[i] = physical[i] && !blocked[i];
     }
     bool changed = false;
-    if (!physical[IN_SPECIAL]) {
-      comboConsumed = false;
-    } else {
+    const bool special = physical[IN_SPECIAL];
+    const bool capture = physical[IN_CAPTURE];
+    if (!special && !capture) comboConsumed = false;
+    if (special || capture) {
       if (!comboConsumed) {
         Profile &profile = config.profiles[config.activeProfile];
-        if (eligible[IN_UP]) {
-          config.activeProfile = (config.activeProfile + 1) % 3;
-          changed = comboConsumed = true;
-        } else if (eligible[IN_DOWN]) {
-          config.activeProfile = (config.activeProfile + 2) % 3;
-          changed = comboConsumed = true;
-        } else if (eligible[IN_LEFT]) {
-          comboConsumed = true;
-          if (profile.turboHz > 2) { --profile.turboHz; changed = true; }
-        } else if (eligible[IN_RIGHT]) {
-          comboConsumed = true;
-          if (profile.turboHz < 30) { ++profile.turboHz; changed = true; }
-        } else {
-          for (uint8_t i = IN_A; i <= IN_RS; ++i) {
-            if (eligible[i]) {
+        if (special) {
+          if (eligible[IN_UP] || eligible[IN_DOWN]) {
+            comboConsumed = true;
+            if (eligible[IN_UP] && !eligible[IN_DOWN] && profile.turboHz < 30) { ++profile.turboHz; changed = true; }
+            if (eligible[IN_DOWN] && !eligible[IN_UP] && profile.turboHz > 2) { --profile.turboHz; changed = true; }
+          } else {
+            for (uint8_t i = IN_SOUTH; i <= IN_RS; ++i) if (eligible[i]) {
               profile.turboMask ^= 1u << i;
               changed = comboConsumed = true;
               break;
             }
           }
+        } else if (eligible[IN_LEFT] || eligible[IN_RIGHT]) {
+          comboConsumed = true;
+          if (eligible[IN_LEFT] != eligible[IN_RIGHT]) {
+            uint8_t next = nextProfile(config, config.activeProfile, eligible[IN_RIGHT]);
+            changed = next != config.activeProfile;
+            config.activeProfile = next;
+          }
+        } else if (eligible[IN_UP] || eligible[IN_DOWN]) {
+          comboConsumed = true;
+          if (eligible[IN_UP] != eligible[IN_DOWN]) {
+            profile.socd = static_cast<SocdMode>((profile.socd + (eligible[IN_UP] ? 1 : 2)) % 3);
+            changed = true;
+          }
         }
       }
-      // All held inputs belong to the control gesture, even if only one action
-      // wins priority. Keep each suppressed after Special is released.
-      for (uint8_t i = 0; i < IN_COUNT; ++i) if (physical[i]) blocked[i] = true;
+      // Capture alone is deferred to release so a shortcut never sends Capture.
+      for (uint8_t i = 0; i < IN_COUNT; ++i)
+        if (physical[i] && (special || comboConsumed)) blocked[i] = true;
     }
+    if (captureWasDown && !capture && !captureUsed && !blocked[IN_CAPTURE]) capturePending = true;
+    if (special || comboConsumed) capturePending = false;
+    bool capturePulse = capturePending;
+    if (reportTick) capturePending = false;
+    if (capture && !captureWasDown) captureUsed = false;
+    if (capture && (comboConsumed || special)) captureUsed = true;
+    captureWasDown = capture;
     if (trackedProfile != config.activeProfile) {
       previousDirections = 0;
       verticalWinner = horizontalWinner = IN_COUNT;
@@ -51,7 +65,7 @@ public:
     accepted = 0;
     for (uint8_t i = 0; i < IN_COUNT; ++i) {
       if (i == IN_SPECIAL) continue;
-      bool down = i == IN_GUIDE ? syncPulse : physical[i];
+      bool down = i == IN_GUIDE ? syncPulse : (i == IN_CAPTURE ? capturePulse : physical[i]);
       if (down && !blocked[i] && !physical[IN_SPECIAL]) accepted |= 1u << i;
     }
     const Profile &profile = config.profiles[config.activeProfile];
@@ -75,8 +89,10 @@ public:
   bool suppressed(InputId id) const { return blocked[id]; }
 
 private:
+  bool keyboardMode = false;
   bool blocked[IN_COUNT] = {};
   bool comboConsumed = false;
+  bool captureWasDown = false, captureUsed = false, capturePending = false;
   uint8_t trackedProfile = 0xff;
   InputId verticalWinner = IN_COUNT, horizontalWinner = IN_COUNT;
   uint32_t accepted = 0, previousDirections = 0, cleanedDirections = 0;
@@ -85,7 +101,7 @@ private:
     uint32_t result = 0;
     for (uint8_t i = 0; i < IN_COUNT; ++i) {
       if ((accepted & (1u << i)) && (turboOn || !(profile.turboMask & (1u << i)))) {
-        result |= 1u << profile.remap[i];
+        result |= 1u << (keyboardMode ? i : profile.remap[i]);
       }
     }
     return result;

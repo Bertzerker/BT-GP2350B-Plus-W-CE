@@ -20,7 +20,7 @@ Config validConfig() {
 int main() {
   Config value = validConfig();
   assert(isConfigValid(value));
-  for (HidMode mode : {MODE_SWITCH, MODE_RESERVED_2, MODE_PS3}) {
+  for (HidMode mode : {MODE_SWITCH, MODE_RESERVED_2}) {
     Config migrated = value;
     migrated.defaultMode = mode;
     migrated.defaultMode = migrateLegacyMode(migrated.defaultMode);
@@ -32,7 +32,8 @@ int main() {
   assert(isSelectableMode(MODE_DIRECTINPUT));
   assert(isSelectableMode(MODE_KEYBOARD));
   assert(!isSelectableMode(MODE_RESERVED_2));
-  assert(!isSelectableMode(MODE_PS3));
+  assert(isSelectableMode(MODE_PS3));
+  assert(migrateLegacyMode(MODE_PS3) == MODE_PS3);
   assert(!isSelectableMode(MODE_SWITCH));
   Config erased;
   memset(&erased, 0xFF, sizeof(erased));
@@ -42,7 +43,7 @@ int main() {
   value = validConfig();
   for (int mode = 0; mode < 256; ++mode) {
     value.defaultMode = static_cast<HidMode>(mode);
-    assert(isConfigValid(value) == (mode < MODE_WEB));
+    assert(isConfigValid(value) == (mode < MODE_WEB || mode == MODE_XBOX_BLE));
   }
   value = validConfig();
   for (int index = 0; index < 256; ++index) {

@@ -10,7 +10,7 @@ async function run() {
   let response = {ok: true, status: 200, json: async () => ({pressed: (1 << 18) | 1})};
   const timers = new Map();
   let nextId = 0;
-  const context = {document: {getElementById: () => status, querySelectorAll: () => pins},
+  const context = {document: {getElementById: id => id === 'wiring-status' ? status : null, querySelectorAll: () => pins},
     AbortController, fetch: async () => {if (response instanceof Error) throw response; return response;},
     setTimeout: (callback, delay) => {timers.set(++nextId, {callback, delay}); return nextId;},
     clearTimeout: id => timers.delete(id)};

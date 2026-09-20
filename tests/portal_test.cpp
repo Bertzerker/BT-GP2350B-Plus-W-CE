@@ -6,6 +6,7 @@
 #include <string>
 #include <string.h>
 #include "../btpad_pico/BoardInputs.h"
+#include "../btpad_pico/KeyboardMap.h"
 
 // Transport doubles execute the real route handlers without a radio or flash.
 class String {
@@ -53,6 +54,7 @@ struct FakeServer {
   String header(const String &key) { return requestHeaders[key.value]; }
   void sendHeader(const String &key, const String &value) { responseHeaders[key.value] = value; }
   void send(int code, const char *, const String &text) { status = code; body = text; }
+  void send_P(int code, const char *, const char *text, size_t length) { status = code; body = std::string(text, length); }
   void request(const char *path, int method, Fields fields = {}, String cookie = "") {
     args = fields; requestHeaders = {{"Cookie", cookie}}; responseHeaders.clear(); status = 0; body = "";
     routes.at({path, method})();
@@ -67,6 +69,7 @@ struct FakeWifi {
 uint32_t nowMs = 0;
 uint32_t millis() { return nowMs; }
 Config config = {};
+KeyboardConfig keyboardConfig = defaultKeyboardConfig();
 bool stableState[IN_COUNT] = {};
 bool commitSuccess = true;
 int commits = 0;
@@ -141,7 +144,21 @@ int main() {
   assert(!contains(server.body, "test-admin-482!"));
   assert(server.responseHeaders["Cache-Control"] == "no-store");
   assert(contains(server.responseHeaders["Content-Security-Policy"], "script-src 'self'; connect-src 'self'"));
-  assert(contains(server.body, "Live wiring test"));
+  assert(contains(server.body, "Profile mapper"));
+  assert(!contains(server.body, "class=wiring"));
+  for (uint8_t i = 0; i < IN_COUNT; ++i) {
+    const std::string badge = "data-input='" + std::to_string(i) + "'";
+    const auto first = server.body.value.find(badge);
+    assert(first != std::string::npos && server.body.value.find(badge, first + 1) == std::string::npos);
+  }
+  assert(!contains(server.body, "name=map16")); // Special remains read-only.
+  assert(contains(server.body, "href=/favicon.png"));
+  assert(contains(server.responseHeaders["Content-Security-Policy"], "img-src 'self'"));
+  FILE *preview = nullptr;
+  if (fopen_s(&preview, "portal-preview.html", "wb") == 0) {
+    fwrite(server.body.value.data(), 1, server.body.value.size(), preview);
+    fclose(preview);
+  }
   assert(contains(server.body, "GP14 SPECIAL"));
   assert(contains(server.body, "GP21 CAPTURE"));
   const int beforeTestCommits = commits;
@@ -162,10 +179,33 @@ int main() {
   assert(commits == beforeTestCommits && memcmp(&config, &beforeTestConfig, sizeof(config)) == 0);
   server.request("/wiring-test.js", HTTP_GET);
   assert(server.status == 200 && contains(server.body, "fetch('/inputs'"));
+  server.request("/favicon.png", HTTP_GET);
+  assert(server.status == 200 && server.body.length() == sizeof(PORTAL_ICON));
+  assert(memcmp(server.body.value.data(), PORTAL_ICON, sizeof(PORTAL_ICON)) == 0);
+  server.request("/background.jpg", HTTP_GET);
+  assert(server.status == 200 && server.body.length() == sizeof(PORTAL_BACKGROUND));
+  Fields keyFields = {{"csrf", sessionCsrf}, {"profile", "2"}};
+  for (uint8_t i=0;i<IN_COUNT;++i) if (i!=IN_SPECIAL) keyFields["key"+std::to_string(i)]=String(keyboardConfig.maps[2][i]);
+  keyFields["key4"]="225"; // Left Shift.
+  const Config gamepadBeforeKeys = config;
+  const KeyboardConfig keysBefore = keyboardConfig;
+  server.request("/keyboard", HTTP_POST, keyFields);
+  assert(server.status==401);
+  commitSuccess=false;
+  server.request("/keyboard", HTTP_POST, keyFields, cookie());
+  assert(server.status==500 && memcmp(&keyboardConfig,&keysBefore,sizeof(keysBefore))==0);
+  commitSuccess=true;
+  keyFields["key4"]="3";
+  server.request("/keyboard", HTTP_POST, keyFields, cookie()); assert(server.status==400);
+  keyFields["key4"]="225";
+  server.request("/keyboard", HTTP_POST, keyFields, cookie());
+  assert(server.status==303 && validKeyboardConfig(keyboardConfig));
+  assert(keyboardConfig.maps[2][IN_SOUTH]==225 && keyboardConfig.maps[0][IN_SOUTH]==29);
+  assert(memcmp(&config,&gamepadBeforeKeys,sizeof(config))==0);
   server.request("/", HTTP_GET, {{"edit", "invalid"}}, cookie());
   assert(server.status == 400);
   Fields fields = settings(2);
-  for (int unavailable : {1, 2, 3}) {
+  for (int unavailable : {1, 2}) {
     fields["mode"] = String(unavailable);
     server.request("/save", HTTP_POST, fields, cookie());
     assert(server.status == 400);
@@ -216,5 +256,29 @@ int main() {
   assert(server.status == 401);
   server.request("/save", HTTP_POST, settings(2), oldCookie);
   assert(server.status == 401);
+  signIn("test-admin-482!");
+  // Profile lifecycle keeps at least one and rolls back both maps on failure.
+  Fields create{{"csrf", sessionCsrf}, {"name", "New game"}};
+  server.request("/profile/new", HTTP_POST, create, cookie());
+  assert(server.status == 409);
+  Fields remove{{"csrf", sessionCsrf}, {"profile", "2"}, {"confirm", "on"}};
+  Config beforeDelete = config; KeyboardConfig keysBeforeDelete = keyboardConfig;
+  server.request("/profile/delete", HTTP_POST, remove); assert(server.status == 401);
+  auto noCsrf = remove; noCsrf.erase("csrf");
+  server.request("/profile/delete", HTTP_POST, noCsrf, cookie()); assert(server.status == 403);
+  commitSuccess = false;
+  server.request("/profile/delete", HTTP_POST, remove, cookie());
+  assert(server.status == 500 && memcmp(&config, &beforeDelete, sizeof(config)) == 0 && memcmp(&keyboardConfig, &keysBeforeDelete, sizeof(keyboardConfig)) == 0);
+  commitSuccess = true;
+
+  server.request("/profile/delete", HTTP_POST, remove, cookie());
+  assert(server.status == 303 && !profileExists(config, 2));
+  server.request("/profile/new", HTTP_POST, create, cookie());
+  assert(server.status == 303 && strcmp(config.profiles[2].name, "New game") == 0);
+  assert(keyboardConfig.maps[2][IN_SOUTH] == defaultKeyboardConfig().maps[2][IN_SOUTH]);
+  remove["profile"] = "2"; server.request("/profile/delete", HTTP_POST, remove, cookie());
+  remove["profile"] = "1"; server.request("/profile/delete", HTTP_POST, remove, cookie());
+  remove["profile"] = "0"; server.request("/profile/delete", HTTP_POST, remove, cookie());
+  assert(server.status == 409 && isConfigValid(config));
   puts("Portal route tests passed (mock HTTP, clock, entropy and storage).");
 }

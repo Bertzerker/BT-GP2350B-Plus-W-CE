@@ -2,10 +2,10 @@
 #include <HID_Bluetooth.h>
 #include <sdkoverride/tusb_gamepad16.h>
 
-// Both helper libraries are linked, so JoystickBT sends report 3, while
-// KeyboardBT sends reports 1 and 2. Advertise only the selected mode.
+// Only the joystick helper is linked, so its report ID is 1.
+// Keyboard mode sends its independent raw report with ID 1.
 static const uint8_t gamepadDescriptor[] = {
-  TUD_HID_REPORT_DESC_GAMEPAD16(HID_REPORT_ID(3))
+  TUD_HID_REPORT_DESC_GAMEPAD16(HID_REPORT_ID(1))
 };
 static const uint8_t keyboardDescriptor[] = {
   TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(1)),

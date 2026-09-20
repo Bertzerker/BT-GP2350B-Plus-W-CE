@@ -12,9 +12,9 @@ void drawControllerDisplay(Screen &screen, const Config &settings, HidMode mode,
   screen.setTextColor(1);
   screen.setCursor(0, 0);
   screen.print(mode == MODE_WEB ? "SETUP" : mode == MODE_KEYBOARD ? "HID-KB" :
-               mode == MODE_DIRECTINPUT ? "DINPUT" : "GEN-HID");
+               mode == MODE_PS3 ? "PS3-USB" : mode == MODE_DIRECTINPUT ? "DINPUT" : mode == MODE_XBOX_BLE ? "XB-BLE" : "GEN-HID");
   screen.setCursor(80, 0);
-  screen.print(mode == MODE_WEB ? "WI-FI" : connected ? "BT:ON" : syncing ? "BT:SYNC" : "BT:WAIT");
+  screen.print(mode == MODE_WEB ? "WI-FI" : mode == MODE_PS3 ? (connected ? "USB:ON" : "USB:WAIT") : connected ? "BT:ON" : syncing ? "BT:SYNC" : "BT:WAIT");
   if (mode == MODE_WEB) {
     screen.setCursor(0, 14); screen.print("BTPad-Setup");
     screen.setCursor(0, 26); screen.print("192.168.4.1");
@@ -33,8 +33,8 @@ void drawControllerDisplay(Screen &screen, const Config &settings, HidMode mode,
     if (physical & (1u << directions[i])) screen.fillRect(dx[i], dy[i], 9, 9, 1);
     else screen.drawRect(dx[i], dy[i], 9, 9, 1);
   }
-  const InputId buttons[] = {IN_X, IN_Y, IN_RB, IN_LB, IN_A, IN_B, IN_RT, IN_LT};
-  const char labels[] = {'X','Y','R','L','A','B','T','T'};
+  const InputId buttons[] = {IN_WEST, IN_NORTH, IN_R1, IN_L1, IN_SOUTH, IN_EAST, IN_R2, IN_L2};
+  const char *labels[] = {"W","N","R1","L1","S","E","R2","L2"};
   for (uint8_t i = 0; i < 8; ++i) {
     const int x = 54 + (i % 4) * 22, y = i < 4 ? 26 : 40;
     const bool held = (physical & (1u << buttons[i])) != 0;
@@ -42,9 +42,9 @@ void drawControllerDisplay(Screen &screen, const Config &settings, HidMode mode,
     else screen.drawCircle(x, y, 6, 1);
     if (profile.turboMask & (1u << buttons[i])) screen.drawCircle(x, y, 4, held ? 0 : 1);
     screen.setTextColor(held ? 0 : 1);
-    screen.setCursor(x - 2, y - 3); screen.print(labels[i]);
+    screen.setCursor(x - (labels[i][1] ? 6 : 3), y - 3); screen.print(labels[i]);
   }
-  const InputId extras[] = {IN_BACK, IN_START, IN_LS, IN_RS, IN_GUIDE, IN_CAPTURE, IN_SPECIAL};
+  const InputId extras[] = {IN_SELECT, IN_START, IN_LS, IN_RS, IN_GUIDE, IN_CAPTURE, IN_SPECIAL};
   const char *extraLabels[] = {"BK", "ST", "LS", "RS", "G", "C", "SP"};
   for (uint8_t i = 0; i < 7; ++i) {
     const bool held = (physical & (1u << extras[i])) != 0;

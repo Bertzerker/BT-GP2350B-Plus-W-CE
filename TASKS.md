@@ -7,6 +7,7 @@ Updated: 2026-09-09. Work in this order; milestone completion requires the gates
 | ID | Priority | Status | Task and completion evidence | Depends on |
 | --- | --- | --- | --- | --- |
 | BASE-01 | P0 | Done | Review both original Markdown files and sketch; document compatibility gaps, dependencies, and acceptance gates. | — |
+| WEB-MOBILE | P1 | Browser checked; device checks pending | Removed duplicate tester box; all 19 GPIO indicators appear once in Profile mapper, with fixed Special row. Added phone-friendly controls and user favicon/background resized for embedded serving. Mock browser verified at 320/390/1024px; endpoint/script tests pass. | WEB-TEST-01 |
 | OLED-GP20 | P0 | Hardware checks pending | User fitted OLED. Added GP2040-CE-inspired status/live-input layout and elapsed-time refresh, moved runtime sync to GP20, and added GP20-at-startup ROM USB flashing. GP21 restored as ordinary Capture. Desktop routing, timing, boot and display bounds tests pass. | BUILD-01 |
 | CFG-01 | P0 | Done | Extract shared configuration types without changing fields; validate loaded settings and reject invalid portal edits with rollback. Desktop tests cover all byte values for modes, profile indices, SOCD, turbo rates, and remaps, plus erased data and string bounds. | BASE-01 |
 | BUILD-01 | P0 | Done | Exact RP2350B Plus W variant verified in Arduino-Pico 6.1.0; project-local build.ps1 pins ARM/150 MHz/16 MB/IPv4 + Bluetooth and OLED dependencies. Both full firmware builds pass, including GP20 sync and portal changes; sizes and hashes are in VALIDATION.md. | BASE-01 |
@@ -17,20 +18,20 @@ Updated: 2026-09-09. Work in this order; milestone completion requires the gates
 | WEB-02 | P1 | Device checks pending | Implemented separate Load profile / Save settings, optional activation, direct HTML construction and strict settings parsing. Desktop tests cover isolation, missing/malformed fields, escaping, and commit-failure rollback. Browser-on-device check remains. | WEB-01 |
 | WEB-TEST-01 | P0 | Device checks pending | User-requested live wiring tester: all 19 physical pins and mapping-table badges highlight while held; authenticated read-only polling, connection recovery and session expiry. Real endpoint and script tests pass. Prioritized for button rewiring before native transport work. | WEB-01 |
 | STORE-01 | P1 | Ready | Add versioned storage, integrity checks, migration/recovery, checked commits and deferred writes. | CFG-02, WEB-02 |
-| PROFILE-01 | P1 | Ready | Implement independent profile banks per mode and validated import/export; widen turbo mask if Guide/Capture turbo is supported. | STORE-01 |
+| PROFILE-01 | P1 | Ready | Retain shared logical gamepad profiles and separate keyboard maps; implement validated import/export; widen turbo mask if Guide/Capture turbo is supported. | STORE-01 |
 | BOOT-01 | P1 | Baseline resolved | GP06 Generic HID, GP09 Keyboard, GP14 WLAN; no-button boot uses saved selectable default. Unimplemented console shortcuts disabled. Revisit distinct native-mode shortcuts when XINPUT-01/PS3-01 are implemented. | MODE-01 |
 | UX-01 | P2 | Ready | Add pairing reset/reconnect and display scheduling; qualify display-present/absent builds and timing on hardware. | HID-01, PROFILE-01 |
 | SYNC-01 | P1 | Device checks pending | User-requested GP20 hold for 3 seconds toggles Bluetooth discovery once per hold; preserves bonds, disconnects current HID host on entry, and suppresses Guide on long holds. Short presses emit on release. Timing tests pass including rollover. Verify actual pairing/reconnect on both transports. | BUILD-01 |
 | BT-FIX-01 | P0 | Initial connection verified | Corrected sync-only SSP confirmation/bonding, persistent device names, and mode-specific descriptors to avoid the core's 300-byte SDP buffer overflow. Flashed headless firmware reports pairing success and HID connected. Windows enumerates a 6-axis/32-button joystick. Input accuracy, keyboard mode and power-cycle reconnect remain HID-01/SYNC-01 checks. | SYNC-01 |
 | MODE-01 | P0 | Flashed; device checks pending | Removed retired console mode, renamed false XInput choice to Generic HID, disabled unavailable native choices/boot shortcuts, and added tested legacy-mode migration preserving credentials/profiles. LT/RT now also use independent generic trigger axes. Both builds pass. After reconnecting in BOOTSEL, the verified headless image was copied to drive I:; COM10 and live application diagnostics returned. Trigger/migration behavior still needs user testing. | INPUT-01 |
-| XINPUT-01 | P0 | Next | Implement a dedicated Xbox-compatible BLE transport/report encoder using the primary references in PROTOCOLS.md. Gate on Windows XInput API enumeration, independent LT/RT and native Guide behavior. Generic HID axes are not completion. | MODE-01 |
+| XINPUT-01 | P0 | Hardware acceptance pending | Dedicated Xbox BLE ATT service and tested 16-byte encoder implemented. Gate on Windows XInput API enumeration, independent LT/RT and native Guide behavior. Generic HID axes are not completion. | MODE-01 |
 | PS3-01 | P1 | Research outlined | Replace placeholder with actual console pairing, feature reports, PS button, input/output and reconnect. See PROTOCOLS.md; requires a console pairing transcript and hardware tests. | MODE-01 |
 | PROTO-01 | P2 | Ready | Produce native protocol feasibility matrix with target hardware and acceptance tests; then create one implementation task per feasible mode. | HID-01 |
 | RELEASE-01 | P2 | Ready | Record host compatibility, latency, reconnect, power and persistence results; package firmware and setup/recovery instructions. | UX-01, BOOT-01 |
 
 ## Known prototype defects and constraints
 
-- User removed PS4 from scope. Native Windows XInput and PS3 do not currently work; unavailable outputs are no longer selectable. Switch remains planned too. Prioritize XINPUT-01 before additional UI polish.
+- User removed PS4 from scope. Xbox BLE is experimental and selectable for testing; Windows XInput recognition is unverified. PS3 remains unavailable. Switch remains planned too. Prioritize XINPUT-01 before additional UI polish.
 - User smoke-tested password and default-mode changes in the portal and found the initial appearance acceptable. Full mapping/profile editing remains untested on hardware.
 
 - Portal password disclosure and profile overwrite are fixed with desktop handler coverage. Actual HTTP parsing, browser behavior and flash recovery still need device validation; stored passwords remain plaintext.
@@ -38,3 +39,20 @@ Updated: 2026-09-09. Work in this order; milestone completion requires the gates
 - Turbo storage currently supports only A through RS. The first fix disables unsupported checkboxes and ignores unsupported turbo fields.
 - Desktop tests cover configuration validation, portal handlers, GP20 timing and the shared input pipeline. User confirmed Windows pairing and basic gamepad inputs. Hardware flash recovery, keyboard/reconnect, SOCD/shortcut behavior, browser/network integration and latency need further verification.
 - The workspace is now a local Git project named BT-GP2350B-Plus-W-CE Bluetooth Controller Firmware. Release packaging and tags remain RELEASE-01 work.
+
+## 2026-09-15 implementation update
+
+- Shared gamepad mapping names now follow btpad.md, independent of output mode; DirectInput face numbering follows that table.
+- Separate full keyboard map per profile, checksummed storage extension, validated save and rollback, modifiers and six-key rollover implemented.
+- Sync automatically closes after HID connection. Classic reconnect clears stalled established ACL links after a timeout and reports bond counts. BLE keeps advertising for bonded-host reconnect. Hardware reconnect remains open.
+- Xbox BLE descriptor/report tests pass; native Windows XInput, Guide, reconnect and pairing must be verified before calling this supported.
+
+## 2026-09-20 follow-up
+
+- Implemented profile create/delete within three slots, keyboard-map reset/isolation, active-profile fallback, last-profile protection and rollback tests.
+- Implemented requested Capture/Special shortcuts and release suppression; desktop tests pass.
+- Added startup selections for every selectable output: GP06 Generic, GP08 PS3 USB, GP09 Keyboard, GP10 Xbox BLE, GP11 DirectInput. GP07 Switch reserved until implemented.
+- Added experimental PS3 USB descriptor/report/features with desktop report tests. Console test remains pending; PS3 Bluetooth remains open.
+- Xbox BLE failed user tests on Windows (Code 10) and MiSTer (immediate disconnect). Added diagnostics/recovery and revised GATT database. Root cause and fix require live trace, not assumptions from Windows driver matching.
+
+2026-09-20 hardware follow-up: user confirms the flashed Xbox BLE build works and stays connected. Windows BLE XInput driver status OK and XInputGetState slot 0 observed. Keep MiSTer, Guide/trigger acceptance and repeated automatic reconnect open. PS3 USB console test remains pending.

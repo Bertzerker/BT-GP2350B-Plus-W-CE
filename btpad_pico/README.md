@@ -17,9 +17,9 @@ As of 2026-09-14, all eight desktop suites pass, including GP20 boot selection, 
 
 ## Compatibility status
 
-Selectable firmware outputs are **Generic HID**, **DirectInput**, and **Keyboard**. The first two use standard Bluetooth Classic HID gamepad reports. Generic HID replaces the misleading XInput name. Native Windows XInput, Switch and PS3 remain separate development targets and cannot currently be selected. The retired console mode has been removed from the firmware; its numeric slot is reserved only to preserve existing EEPROM layout.
+Selectable firmware outputs are **Generic HID**, **DirectInput**, **Keyboard**, **PS3 USB (experimental)**, and **Xbox BLE (experimental)**. The first two use standard Bluetooth Classic HID gamepad reports. Generic HID replaces the misleading XInput name. Xbox BLE uses a separate transport; Windows driver health and XInput API enumeration are now verified. Switch and PS3 Bluetooth remain unavailable; PS3 USB is experimental. The retired console mode has been removed from the firmware; its numeric slot is reserved only to preserve existing EEPROM layout.
 
-Saved defaults for unimplemented/removed modes migrate to Generic HID without resetting passwords or profiles. GP06 selects Generic HID; GP09 selects Keyboard; GP14 selects setup. The former GP07/GP08/GP11 mode shortcuts no longer select placeholder protocols.
+Saved defaults for unimplemented/removed modes migrate to Generic HID without resetting passwords or profiles. GP06 selects Generic HID; GP09 selects Keyboard; GP14 selects setup. GP08 selects PS3 USB, GP10 Xbox BLE, and GP11 DirectInput; GP07 is reserved for Switch.
 
 Generic HID sends directions through a real eight-direction POV hat; X/Y remain centered. LT and RT drive independent Z and Rz axes without duplicate button 7/8 presses. Their released value is the axis minimum, even with no switch connected; this is not a low GPIO reading. Digital switches only provide released/fully pressed endpoints. DirectInput retains its user-verified legacy X/Y directions and trigger axis/button reports. Guide remains ordinary button 13; native Game Bar/Steam Guide behavior is not implemented.
 
@@ -33,33 +33,35 @@ The mapping table below retains the desired labels for future XInput, Switch and
 
 ### Live wiring test
 
-Hold GP14 while powering on, connect to **BTPad-Setup**, open **http://192.168.4.1/** and sign in. The **Live wiring test** at the top shows all 19 inputs, including GP14 Special, GP20 Guide/Sync and GP21 Capture. Hold a button or move the joystick: its GPIO badge turns green and reads **Pressed**, both in the tester and mapping table. Release it to clear the highlight.
+Hold GP14 while powering on, connect to **BTPad-Setup**, open **http://192.168.4.1/** and sign in. In **Profile mapper**, hold a button or move the joystick: its GPIO badge turns green and reads **Pressed**. Release it to clear the highlight. Each of the 19 inputs appears once; GP14 Special has a fixed read-only row. There is no separate wiring-test box.
+
+The page uses the artwork in `style/` for its favicon and background, with smaller embedded derivatives. Forms and mapper rows fit narrow mobile screens, with 16px form text and touch-sized controls. See [artwork build and preview instructions](../style/README.md).
 
 This reads debounced physical pins before remapping, SOCD and turbo; opposite directions and multiple buttons remain visible together. Setup mode does not run Special/Sync shortcuts, and testing does not save settings. Updates arrive roughly every 100 ms; hold very short taps a little longer. Connection failures clear the highlights and retry; an expired session asks you to sign in again. JavaScript must be enabled.
 
 All inputs are active-low and should wire each button between the GPIO and GND. The sketch enables internal pull-ups.
 
-| GPIO | XInput | Switch | PS3 | DirectInput | Keyboard |
-| --- | --- | --- | --- | --- | --- |
-| GP02 | UP | UP | UP | UP | Up arrow |
-| GP03 | DOWN | DOWN | DOWN | DOWN | Down arrow |
-| GP04 | RIGHT | RIGHT | RIGHT | RIGHT | Right arrow |
-| GP05 | LEFT | LEFT | LEFT | LEFT | Left arrow |
-| GP06 | A | B | Cross | 2 | z |
-| GP07 | B | A | Circle | 3 | x |
-| GP10 | X | Y | Square | 1 | a |
-| GP11 | Y | X | Triangle | 4 | s |
-| GP13 | LB | L | L1 | 5 | v |
-| GP12 | RB | R | R1 | 6 | f |
-| GP09 | LT | ZL | L2 | 7 | c |
-| GP08 | RT | ZR | R2 | 8 | d |
-| GP17 | Back | Minus | Select | 9 | Backspace |
-| GP16 | Start | Plus | Start | 10 | Enter |
-| GP18 | LS | LS | L3 | 11 | b |
-| GP19 | RS | RS | R3 | 12 | g |
-| GP14 | Special | Special | Special | Special | Special |
-| GP20 | Guide | Home | PS | 13 | Esc |
-| GP21 | - | Capture | - | - | - |
+| GPIO | Maps to | XInput | Switch | PS3 | DirectInput | Keyboard |
+| --- | --- | --- | --- | --- | --- | --- |
+| GP02 | UP | UP | UP | UP | UP | Up arrow |
+| GP03 | DOWN | DOWN | DOWN | DOWN | DOWN | Down arrow |
+| GP04 | RIGHT | RIGHT | RIGHT | RIGHT | RIGHT | Right arrow |
+| GP05 | LEFT | LEFT | LEFT | LEFT | LEFT | Left arrow |
+| GP06 | South | A | B | Cross | 2 | z |
+| GP07 | East |B | A | Circle | 3 | x |
+| GP10 | West | X | Y | Square | 1 | a |
+| GP11 | North |Y | X | Triangle | 4 | s |
+| GP13 | L1 |LB | L | L1 | 5 | v |
+| GP12 | R1 | RB | R | R1 | 6 | f |
+| GP09 | L2 |LT | ZL | L2 | 7 | c |
+| GP08 | R2 |RT | ZR | R2 | 8 | d |
+| GP17 | Select | Back | Minus | Select | 9 | Backspace |
+| GP16 | Start |Start | Plus | Start | 10 | Enter |
+| GP18 | LS | LS | LS | L3 | 11 | b |
+| GP19 | RS | RS | RS | R3 | 12 | g |
+| GP14 | Special |Special | Special | Special | Special | Special |
+| GP20 | Guide | Guide | Home | PS | 13 | Esc |
+| GP21 | Capture | - | Capture | - | 14 | TAB |
 
 ## Boot Mode Selection
 
@@ -68,22 +70,24 @@ Hold one button while powering the board:
 | Held GPIO | Boot mode |
 | --- | --- |
 | GP06 | Generic HID |
+| GP07 | Reserved for future Switch; uses saved default today |
+| GP08 | PS3 USB (experimental) |
 | GP09 | Keyboard |
+| GP10 | Xbox BLE |
+| GP11 | DirectInput |
 | GP14 | WLAN setup portal |
+| GP20 | USB firmware flashing |
 
-GP06 selects Generic HID. DirectInput can be selected as the saved default in the web UI; no button held at boot uses that saved default.
+With no button held, the saved default is used. GP20 flashing has highest priority, followed by GP14 setup; hold only one mode button.
 
-## Special Button
+## Runtime shortcuts
 
-GP14 is the special/profile/turbo button.
+- Capture GP21 + Left/Right: previous/next existing profile.
+- Capture GP21 + Up/Down: cycle SOCD forward/backward.
+- Special GP14 + Up/Down: increase/decrease turbo speed, 2–30 Hz.
+- Special + a game button: toggle its turbo.
 
-- Hold Special + Up: next profile
-- Hold Special + Down: previous profile
-- Hold Special + Left: decrease turbo speed
-- Hold Special + Right: increase turbo speed
-- Hold Special + any game button: toggle turbo for that physical button
-
-Press Special first, then the shortcut input. One action is allowed per Special hold; priority is Up, Down, Left, Right, then the first held game button in GPIO-map order. All inputs held during Special are suppressed individually until released, including after Special is released. Inputs already sent before Special was pressed cannot be withdrawn. A speed shortcut at the 2/30 Hz limit is consumed without changing another setting. GP20 sync/taps are also suppressed if they belong to a Special gesture.
+Press the modifier first. Each modifier hold performs one action; release before the next shortcut. All inputs participating in a shortcut stay suppressed until individually released. Capture alone sends on release. Already-transmitted inputs cannot be withdrawn if a modifier is pressed later.
 
 ## Bluetooth sync
 
@@ -91,7 +95,7 @@ Hold GP20 for three seconds to toggle Bluetooth sync on/off in either gamepad or
 
 The pairing fix advertises only the selected gamepad or keyboard descriptor, avoiding overflow in Arduino-Pico's fixed service-record buffer. If Windows retained an entry from the earlier firmware, remove that BTPad entry before retrying pairing. USB serial at 115200 baud reports sync, connection, pairing and authentication status once per second (`0xff` means no result yet; `0x00` means success).
 
-A short GP20 press produces its mapped Guide input on release, for one report. A long hold produces no Guide input. GP21 is now an ordinary held Capture input. GP20 sync is inactive in WLAN setup mode. Pairing and reconnect behavior still require testing on the board.
+A short GP20 press produces its mapped Guide input on release, for one report. A long hold produces no Guide input. GP21 sends Capture on release unless used in a profile/SOCD shortcut. GP20 sync is inactive in WLAN setup mode. Pairing and reconnect behavior still require testing on the board.
 
 Hold GP20 while plugging in or restarting the board to enter the RP2350 ROM USB flashing mode. It takes priority over other boot shortcuts and runs before display, storage or Bluetooth initialization. Release it once the boot drive appears and copy the UF2. During normal play a GP20 hold only toggles Bluetooth sync. Until firmware containing this shortcut has been installed, use the board's physical BOOTSEL button.
 
@@ -117,7 +121,7 @@ The portal currently supports:
 - turbo frequency
 - SOCD mode
 
-The three profiles are currently shared across modes. Select a profile and click **Load profile** before editing it. **Use this profile** activates the profile when saved; saving another profile otherwise leaves the active profile unchanged. Turbo is limited to the twelve physical buttons A through RS (GP06, GP07, GP10, GP11, GP13, GP12, GP09, GP08, GP17, GP16, GP18, GP19).
+The three profiles are currently shared across modes. Select a profile and click **Load profile** before editing it. **Use this profile** activates the profile when saved; saving another profile otherwise leaves the active profile unchanged. Turbo is limited to the twelve physical buttons South through RS (GP06, GP07, GP10, GP11, GP13, GP12, GP09, GP08, GP17, GP16, GP18, GP19).
 
 Saved configuration is validated before use. Invalid settings reset the complete configuration, including the admin password, to defaults. Portal settings are parsed strictly and validated before saving. Rejected edits and reported commit failures preserve the previous live settings; power-loss recovery of flash remains unverified. Versioned storage and physical recovery remain planned work.
 
@@ -166,3 +170,29 @@ Run `node tests/wiring_test.cjs` to check the live tester script's highlights, c
 ## Next work
 
 First verify the flashed Generic HID hat, trigger isolation and automatic reconnect on hardware while preserving working DirectInput. SOCD/shortcut, keyboard and persistence checks remain. Native protocol and storage work is tracked in [TASKS.md](../TASKS.md).
+
+## Shared profiles and keyboard mapping
+
+The Profile mapper uses neutral btpad.md names (South/East/West/North, L1/R1/L2/R2 and system buttons), independent of selected protocol. DirectInput face numbering is West=1, South=2, East=3, North=4. Switch is still unimplemented; shared profiles are ready for future protocol adapters.
+
+Expand **Keyboard mapper for this profile** to map each physical GPIO to a standard keyboard usage, including modifiers, punctuation, navigation, keypad, F1–F24 and international keys. Keyboard mappings do not pass through gamepad remaps. Special stays reserved; GP20 is a short-release key and long-hold sync control. Six ordinary keys plus eight modifiers can be held simultaneously. More ordinary keys report rollover; host layout determines characters. Settings are saved in a checksummed extension without changing existing profile/password offsets.
+
+To test Xbox BLE, select it as default in setup, reboot, hold GP20 for three seconds and pair **BTPad-Xbox**. Pairing automatically closes after connection. Remove stale host pairing records and pair again after reflashing if necessary. Run `./tools/test-xinput.ps1` on Windows: enumeration in the joystick control panel alone is not proof of XInput. Verify Guide separately with Game Bar/Steam settings enabled. Neither Xbox-console support nor native Switch support is implemented.
+
+## Current controls and PS3 test mode — 2026-09-20
+
+Current shortcut summary:
+
+- Capture GP21 + Left/Right: previous/next non-deleted profile.
+- Capture GP21 + Up/Down: cycle SOCD forward/backward.
+- Special GP14 + Up/Down: increase/decrease turbo speed (2–30 Hz).
+- Special + a game button: toggle turbo. One action per modifier hold; release to rearm.
+- Capture alone sends on release; shortcut chords do not send Capture or their directions.
+
+Create/delete profile controls manage the three existing storage slots. New profiles start with default gamepad/keyboard maps. Deleting an active profile selects another; deleting the final profile is rejected. Save failures restore both maps in RAM.
+
+Hold a startup button while connecting power: GP06 Generic HID, GP08 PS3 USB, GP09 Keyboard, GP10 Xbox BLE, GP11 DirectInput, GP14 setup, GP20 flashing. GP07 is reserved for future Switch and does not activate an implemented transport.
+
+**PS3 USB (experimental)** is a USB-only console test mode with a dedicated 49-byte DS3 report and feature responses adapted from GP2040-CE. Use a data cable to the PS3 and a short GP20 tap for PS. It does not pair over Bluetooth. USB serial is absent in this mode; GP20-at-startup still enters flashing. Motors/motion sensing are not fitted. Console acceptance is pending.
+
+**Xbox BLE:** Windows selects xinputhid.inf but the tested earlier build fails with Code 10 / 0xC00000E5. MiSTer also disconnects just after pairing. The revised build adds Generic Attribute service, encrypted Report Map reads, pairing/subscription/disconnect diagnostics, encryption-state checks and a 30-second incomplete-HID timeout. The user confirms the revised build works in Windows; its BLE driver is healthy and XInput API enumeration succeeds. The exact root cause is not isolated. MiSTer and power-cycle reconnect remain pending. Remove the stale BTPad-Xbox host pairing after flashing, boot with GP10, release, then hold GP20 for three seconds to pair again. Keep USB connected for the serial trace. Verify XInput with tools/test-xinput.ps1 and then test reconnect without sync.

@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdio.h>
+#include "../btpad_pico/BootModes.h"
 constexpr int INPUT_PULLUP = 2, LOW = 0;
 int readings[2], index = 0, resets = 0, waited = 0;
 void pinMode(int pin, int mode) { assert(pin == 20 && mode == INPUT_PULLUP); }
@@ -14,5 +15,12 @@ int main() {
     assert(resets == (first == LOW && second == LOW));
     assert(waited == (first == LOW ? 40 : 10));
   }
+  for (const auto &entry : BOOT_MODES) {
+    auto held = [&](uint8_t gpio) { return gpio == entry.gpio; };
+    assert(selectBootMode(MODE_DIRECTINPUT, held) ==
+      (entry.mode == MODE_SWITCH ? MODE_DIRECTINPUT : entry.mode));
+  }
+  assert(selectBootMode(MODE_KEYBOARD, [](uint8_t) {return false;}) == MODE_KEYBOARD);
+  assert(selectBootMode(MODE_KEYBOARD, [](uint8_t) {return true;}) == MODE_WEB);
   puts("GP20 boot selector passed: stable hold, release, unpressed.");
 }

@@ -9,9 +9,14 @@ uint32_t millis() { return testNow; }
 constexpr int HCI_STATE_WORKING = 1;
 int hci_get_state() { return HCI_STATE_WORKING; }
 struct { bool connected() { return ::connected; } } PicoBluetoothHID;
-struct btstack_linked_list_iterator_t {};
-void hci_connections_get_iterator(btstack_linked_list_iterator_t *) {}
-bool btstack_linked_list_iterator_has_next(btstack_linked_list_iterator_t *) { return busy; }
+constexpr int BD_ADDR_TYPE_ACL = 0xfd, HCI_CON_HANDLE_INVALID = 0xffff;
+struct hci_connection_t { int address_type = BD_ADDR_TYPE_ACL; int con_handle = 42; } testLink;
+struct btstack_linked_list_iterator_t { bool consumed = false; };
+void hci_connections_get_iterator(btstack_linked_list_iterator_t *it) { it->consumed = false; }
+bool btstack_linked_list_iterator_has_next(btstack_linked_list_iterator_t *it) { return busy && !it->consumed; }
+void *btstack_linked_list_iterator_next(btstack_linked_list_iterator_t *it) { it->consumed = true; return &testLink; }
+int disconnects = 0;
+void gap_disconnect(int) { ++disconnects; }
 typedef uint8_t bd_addr_t[6];
 typedef uint8_t link_key_t[16];
 typedef int link_key_type_t;
@@ -33,6 +38,7 @@ int main() {
   reconnectBluetooth(); assert(calls == 0);
   testNow = 10000; reconnectBluetooth(); assert(calls == 1 && testSelected == 1);
   testNow += 60000; reconnectBluetooth(); assert(calls == 1); // Pending ACL is not overwritten.
+  testNow += 20000; reconnectBluetooth(); assert(calls == 1 && disconnects == 1);
   busy = false; reconnectBluetooth(); assert(calls == 2 && testSelected == 2);
   busy = false; bluetoothSync = true; testNow += 10000; reconnectBluetooth(); assert(calls == 2);
   bluetoothSync = false; testNow += 9999; reconnectBluetooth(); assert(calls == 2);

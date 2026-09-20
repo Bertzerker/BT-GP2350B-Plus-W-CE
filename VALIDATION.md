@@ -124,3 +124,27 @@ OLED build: 524696 bytes program, 96380 bytes static RAM. UF2 SHA256 `5D2A69F2E5
 Headless build also passes: 510500 bytes program, 96092 bytes static RAM. SHA256 `39301EB8E1661C4713D82E2FF83F48D7AA99B87C3E26C32015E19DC40D7BEC57`. Log `.build/compile-gp20-headless.log`. Use the OLED image for the user's now-fitted display.
 
 After the user connected the board, verified RP2350 bootloader identity on I: and OLED SHA256 `5D2A69F2E557A0DC45098166AABE318297E22D012BC6D2D5581B7F132F2476CC`, then copied the OLED UF2 successfully. COM10 returned with two live `BT sync=0 connected=0 pairing=0xff auth=0xff` diagnostic lines. Startup is confirmed; OLED appearance, GP20 physical boot/sync actions and GP21 behavior still require user checks.
+
+## Mobile profile mapper — 2026-09-14
+
+Removed the separate live wiring section. Profile mapper is the sole display of each physical GPIO, including read-only GP14 Special. Inputs highlight without changing mapping/settings. Added responsive spacing, fixed-width turbo column, 16px form controls and 44px touch targets. Original user artwork is preserved in `style/`; generated icon/background total 97,115 bytes versus 1,458,418 source bytes. Images are embedded as binary flash arrays and served locally with explicit lengths and MIME types; CSP allows same-origin images.
+
+All eight C++ suites and wiring-script tests pass. Route tests verify exactly one badge per input, no Special mapping field, artwork bytes and authentication/expiry behavior. Local browser preview of the actual exported page checked at 320px and 390px with no horizontal overflow, and 1024px desktop; favicon loaded at 64px and GP06 visibly highlighted inside the table. Preview uses mock input/HTTP and is not on-device Wi-Fi validation.
+
+Both builds pass. OLED: 623536 bytes program, 96380 bytes static RAM, SHA256 `CDAD9252B087D980B2487B39E2724EB2036021C20B3EABDF340643FB9BB735E8`. Headless: 609340 bytes program, 96092 bytes static RAM, SHA256 `1C1296F6ABB0F2CF37E80BAD1533F89C35D32A9ACEF2E1F2197123EF84819382`. Logs: `.build/compile-mobile-display.log` and `.build/compile-mobile-headless.log`.
+
+The first flash attempt was blocked before execution by automatic approval review reporting a usage limit. After the user requested continuation, reverified the image hash and RP2350 bootloader on I: and copied the OLED image successfully. COM10 returned with two live `BT sync=0 connected=0 pairing=0xff auth=0xff` diagnostic lines, confirming startup. Actual mobile Wi-Fi page behavior still requires user testing.
+
+## Profiles, keyboard, Xbox BLE and PS3 USB — 2026-09-20
+
+Eleven C++ suites pass, plus the wiring-script suite. Added coverage: full keyboard usages/modifiers/rollover/checksum and map isolation; create/delete authentication, CSRF, storage rollback, slot reuse, last-profile protection; Capture profile/SOCD shortcuts, Special turbo speed, deferred Capture taps; startup mode mapping; Xbox descriptor/report sizes; PS3 descriptor balance/size, controls/pressure and bounded feature reads. Existing core tests continue to pass.
+
+Browser preview of the actual exported portal confirms create/delete controls, all 18 keyboard dropdowns each populated with 135 choices, and exactly 19 live GPIO indicators. Expanded keyboard section has no horizontal overflow at 320px viewport (305px client width after scrollbar). This preview uses mocked input and does not prove on-device HTTP behavior.
+
+OLED build: 646404 bytes program, 97160 bytes static RAM. SHA256 `17C5093A42366C7532928B298D3F70B4DB05DD83DE90639F252DA3B2DF1345D8`. Headless: 632200 bytes program, 96868 bytes static RAM. SHA256 `D5F71B513F9F785EE344723548FC0BAA9357D8F78027C72FEC5FF9CFDCB168C8`. Logs `.build/compile-profiles-protocols-display.log` and `.build/compile-profiles-protocols-headless.log`. RP2350 bootloader identity verified on I:, OLED UF2 copied successfully, COM10 returned.
+
+User reported earlier Xbox BLE Code 10 / event 411 / 0xC00000E5 in Windows, and immediate post-pairing disconnect on MiSTer. After this flash, user confirms Xbox BLE works and stays connected. Live serial stayed `sync=0 connected=1`; Windows BTPad-Xbox and Bluetooth LE XINPUT device both report OK. The XInput test helper observed slot 0 with neutral controls. The trace started after pairing, so it does not prove which startup change resolved the failure. Guide, simultaneous triggers, MiSTer and repeated power-cycle reconnect remain separate checks.
+
+PS3 is a USB-only experimental mode, selected with GP08. Console acceptance and PS3 Bluetooth are not verified/implemented respectively. Existing configuration layout remains unchanged; empty names mark deleted slots. Keyboard maps are a versioned checksummed extension. The USB keyboard helper was removed to avoid its strong SET_REPORT callback conflicting with PS3; Classic keyboard now sends its own raw reports, and the sole joystick helper uses report ID 1. Re-pair Classic modes after flashing if a host cached the previous report ID.
+
+User acceptance: after the Windows Xbox BLE checks, the user reported that it works well for now and requested committing this state to GitHub. This does not independently verify MiSTer, power-cycle reconnect or PS3 console behavior.

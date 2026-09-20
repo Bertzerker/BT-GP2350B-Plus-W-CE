@@ -12,7 +12,7 @@ int main() {
     assert(out.hatAngle == angles[i] && out.x == 0 && out.y == 0);
   }
   for (unsigned int triggers = 0; triggers < 4; ++triggers) {
-    const uint32_t state = ((triggers & 1) ? 1u << IN_LT : 0) | ((triggers & 2) ? 1u << IN_RT : 0);
+    const uint32_t state = ((triggers & 1) ? 1u << IN_L2 : 0) | ((triggers & 2) ? 1u << IN_R2 : 0);
     const auto out = encodeGamepad(state, MODE_GAMEPAD);
     assert(out.buttons == 0);
     assert(out.z == ((triggers & 1) ? 32767 : -32767));
@@ -23,5 +23,8 @@ int main() {
     assert(legacy.z == out.z && legacy.rz == out.rz);
   }
   assert(encodeGamepad(1u << IN_GUIDE, MODE_GAMEPAD).buttons == (1u << 12));
+  assert(encodeGamepad(1u << IN_SOUTH, MODE_DIRECTINPUT).buttons == 2);
+  assert(encodeGamepad(1u << IN_EAST, MODE_DIRECTINPUT).buttons == 4);
+  assert(encodeGamepad(1u << IN_WEST, MODE_DIRECTINPUT).buttons == 1);
   puts("Gamepad reports passed: hat directions, trigger isolation, legacy DirectInput.");
 }

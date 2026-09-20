@@ -1,26 +1,13 @@
-/*
-  Bluetooth HID controller for Waveshare RP2350B-Plus-W.
-
-  Target: Earle Philhower arduino-pico core with IP/Bluetooth Stack enabled.
-  This sketch uses the core's Bluetooth Classic HID helpers:
-    - JoystickBT for gamepad-like modes
-    - KeyboardBT for keyboard mode
-
-  Notes:
-    - Generic gamepad and keyboard are implemented. Native XInput, Switch
-      and PS3 remain planned. True
-      console-native Bluetooth compatibility requires protocol-specific report
-      descriptors, pairing behavior, and in some cases authentication.
-    - GP06 is listed twice in btpad.md for boot mode selection. This sketch
-      uses GP06 for generic gamepad and offers DirectInput in the web UI.
-*/
+/* Bluetooth/USB controller firmware for Waveshare RP2350B-Plus-W.
+ * Classic Generic HID/DirectInput/keyboard, experimental Xbox BLE and PS3 USB.
+ * See README.md and PROTOCOLS.md for host validation and known limitations.
+ */
 
 #include <Arduino.h>
 #include <EEPROM.h>
 #include <WiFi.h>
 #include <WebServer.h>
 #include <JoystickBT.h>
-#include <KeyboardBT.h>
 #include <HID_Bluetooth.h>
 #include <pico/bootrom.h>
 
@@ -46,18 +33,16 @@
 #include "GamepadOutput.h"
 #include "DisplayUI.h"
 #include "BootControl.h"
+#include "BootModes.h"
+#include "PS3USB.h"
+#include "KeyboardMap.h"
 
-const uint8_t KEY_LABELS[IN_COUNT] = {
-  KEY_UP_ARROW, KEY_DOWN_ARROW, KEY_RIGHT_ARROW, KEY_LEFT_ARROW,
-  'z', 'x', 'a', 's', 'v', 'f', 'c', 'd',
-  KEY_BACKSPACE, KEY_RETURN, 'b', 'g', 0, KEY_ESC, 0
-};
-
-constexpr size_t EEPROM_SIZE = sizeof(Config);
+constexpr size_t EEPROM_SIZE = sizeof(Config) + sizeof(KeyboardConfig);
 constexpr uint16_t DEBOUNCE_MS = 5;
 constexpr uint16_t REPORT_MS = 4;
 
 Config config;
+KeyboardConfig keyboardConfig;
 HidMode currentMode = MODE_GAMEPAD;
 WebServer server(80);
 
@@ -76,6 +61,12 @@ bool bluetoothSync = false;
 bool syncTap = false;
 static btstack_packet_callback_registration_t pairingEvents;
 static uint8_t pairingStatus = 0xff, authenticationStatus = 0xff;
+#include "XboxBLE.h"
+
+bool bluetoothConnected() {
+  if (currentMode == MODE_PS3) return PS3USB::connected();
+  return currentMode == MODE_XBOX_BLE ? XboxBLE::connected() : PicoBluetoothHID.connected();
+}
 
 void observePairing(uint8_t type, uint16_t channel, uint8_t *packet, uint16_t size) {
   (void)channel;
@@ -91,8 +82,10 @@ void observePairing(uint8_t type, uint16_t channel, uint8_t *packet, uint16_t si
 }
 
 void setBluetoothSync(bool enabled) {
+  if (currentMode == MODE_PS3) return;
   BluetoothLock lock;
   bluetoothSync = enabled;
+  if (currentMode == MODE_XBOX_BLE) { XboxBLE::sync(enabled); return; }
   // Accept Just Works confirmation only during the physical sync window.
   gap_ssp_set_io_capability(SSP_IO_CAPABILITY_NO_INPUT_NO_OUTPUT);
   gap_ssp_set_auto_accept(enabled ? 1 : 0);
@@ -140,12 +133,16 @@ void resetConfig() {
 
 bool saveConfig() {
   EEPROM.put(0, config);
+  keyboardConfig.checksum = keyboardChecksum(keyboardConfig);
+  EEPROM.put(sizeof(Config), keyboardConfig);
   return EEPROM.commit();
 }
 
 void loadConfig() {
   EEPROM.begin(EEPROM_SIZE);
   EEPROM.get(0, config);
+  EEPROM.get(sizeof(Config), keyboardConfig);
+  if (!validKeyboardConfig(keyboardConfig)) keyboardConfig = defaultKeyboardConfig();
   if (!isConfigValid(config)) {
     resetConfig();
     saveConfig();
@@ -165,13 +162,7 @@ bool pinHeld(uint8_t gpio) {
 }
 
 HidMode detectBootMode() {
-  if (pinHeld(14)) return MODE_WEB;
-  if (pinHeld(6)) return MODE_GAMEPAD;
-
-
-
-  if (pinHeld(9)) return MODE_KEYBOARD;
-  return config.defaultMode;
+  return selectBootMode(config.defaultMode, pinHeld);
 }
 
 void initInputs() {
@@ -219,30 +210,19 @@ void sendGamepadReport() {
   JoystickBT.send_now();
 }
 void sendKeyboardReport() {
-  static bool keyOutputState[IN_COUNT] = {};
-  // Release old directions/keys before pressing replacements. KeyboardBT emits
-  // a report on each call, so the reverse order can briefly send both opposites.
-  for (uint8_t logical = 0; logical < IN_COUNT; ++logical) {
-    if (KEY_LABELS[logical] && keyOutputState[logical] && !logicalPressed((InputId)logical)) {
-      KeyboardBT.release(KEY_LABELS[logical]);
-    }
-  }
-  for (uint8_t logical = 0; logical < IN_COUNT; ++logical) {
-    if (!KEY_LABELS[logical]) continue;
-    bool down = logicalPressed((InputId)logical);
-    if (down && !keyOutputState[logical]) KeyboardBT.press(KEY_LABELS[logical]);
-    keyOutputState[logical] = down;
-  }
+  static KeyboardReport report;
+  report = encodeKeyboard(logicalState, keyboardConfig.maps[config.activeProfile]);
+  PicoBluetoothHID.send(1, &report, sizeof(report));
 }
 #include "WebPortal.h"
 
 void initBluetooth() {
   BluetoothLock lock;
+  if (currentMode == MODE_XBOX_BLE) { XboxBLE::begin(); return; }
   pairingEvents.callback = observePairing;
   hci_add_event_handler(&pairingEvents);
   const char *name = bluetoothNames[currentMode];
   if (currentMode == MODE_KEYBOARD) {
-    KeyboardBT.HID_Keyboard::begin();
     PicoBluetoothHID.startHID(name, name, 0x2540, 33, keyboardDescriptor, sizeof(keyboardDescriptor));
   } else {
     JoystickBT.HID_Joystick::begin();
@@ -261,7 +241,7 @@ void reportBluetoothStatus() {
   uint8_t pairing, authentication;
   {
     BluetoothLock lock;
-    connected = PicoBluetoothHID.connected();
+    connected = bluetoothConnected();
     pairing = pairingStatus;
     authentication = authenticationStatus;
   }
@@ -290,7 +270,7 @@ void updateDisplay() {
   bool connected = false;
   if (currentMode != MODE_WEB) {
     BluetoothLock lock;
-    connected = PicoBluetoothHID.connected();
+    connected = bluetoothConnected();
   }
   drawControllerDisplay(display, config, currentMode, physical, bluetoothSync, connected);
   display.display();
@@ -321,6 +301,8 @@ void setup() {
 
   if (currentMode == MODE_WEB) {
     startWebConfig();
+  } else if (currentMode == MODE_PS3) {
+    PS3USB::begin();
   } else {
     initBluetooth();
     setBluetoothSync(false);
@@ -342,15 +324,20 @@ void loop() {
   }
   bool reportDue = static_cast<uint32_t>(millis() - lastReportMs) >= REPORT_MS;
   if (reportDue) syncTap = syncButton.takeTap();
-  if (inputPipeline.scan(stableState, config, syncTap)) saveConfig();
+  if (inputPipeline.scan(stableState, config, syncTap, currentMode == MODE_KEYBOARD, reportDue)) saveConfig();
   updateTurboClock();
   logicalState = inputPipeline.report(config.profiles[config.activeProfile], turboPhase);
   if (reportDue) {
     lastReportMs = millis();
-    if (currentMode == MODE_KEYBOARD) sendKeyboardReport();
+    if (currentMode == MODE_PS3) PS3USB::send(logicalState);
+    else if (currentMode == MODE_XBOX_BLE) XboxBLE::send(logicalState);
+    else if (currentMode == MODE_KEYBOARD) sendKeyboardReport();
     else sendGamepadReport();
   }
   reportBluetoothStatus();
-  reconnectBluetooth();
+  bool linked;
+  { BluetoothLock lock; linked = bluetoothConnected(); }
+  if (bluetoothSync && linked) setBluetoothSync(false);
+  if (currentMode != MODE_XBOX_BLE && currentMode != MODE_PS3) reconnectBluetooth();
   updateDisplay();
 }

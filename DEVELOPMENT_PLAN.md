@@ -6,7 +6,7 @@ Updated: 2026-09-09. Requirements: [btpad.md](btpad.md). Execution queue: [TASKS
 
 Build reliable wireless gamepad and keyboard firmware for the Waveshare RP2350B-Plus-W with the specified GPIO wiring, configurable profiles, SOCD, turbo, and optional display. Ship a tested generic Bluetooth HID gamepad and keyboard baseline first. Treat native Switch, PS3, and Xbox compatibility as separate protocol projects with their own host acceptance tests.
 
-The current sketch is a prototype, not a verified release. Exact-target compilation is now scripted; see [VALIDATION.md](VALIDATION.md) for build evidence. Physical pairing tests remain pending. Mode labels currently share the same generic joystick transport; renaming that transport does not implement XInput or console compatibility.
+The current sketch is a prototype, not a verified release. Exact-target compilation is now scripted; see [VALIDATION.md](VALIDATION.md) for build evidence. Basic Classic pairing has been verified. Xbox BLE now has a separate experimental transport; Windows XInput API recognition and console compatibility must not be inferred from labels or compilation.
 
 ## Decisions
 
@@ -36,11 +36,11 @@ Use one pipeline: scan/debounce -> special-combo consumption -> remapping -> log
 
 Check joystick API ranges, report batching, button numbering (including the requested DirectInput 2/3/1 ordering), keyboard rollover, and release behavior. Gate: automated edge-case tests plus recorded PC pairing, reconnect, sustained input, and stuck-key checks. Measure scan-to-report timing; a 4 ms loop interval is not measured wireless latency.
 
-### 3. Usable setup portal and durable per-mode profiles
+### 3. Usable setup portal and durable shared profiles
 
 Fix password disclosure, enforce initial password replacement, protect reads and writes, remove URL credentials, escape user-provided HTML, and add request forgery protection. Specify credential recovery and the relation between AP and admin passwords. Separate profile selection from saving an edited profile so selecting another profile cannot overwrite it with the old form contents.
 
-Introduce versioned configuration with integrity checks, explicit migration/reset behavior, checked writes, and wear-conscious persistence. Add independent profile banks per mode, schema validation, and import/export. Gate: first-run/login/save/reload/logout tests, unauthorized request rejection, profile isolation, and interrupted-save recovery on hardware.
+Introduce versioned configuration with integrity checks, explicit migration/reset behavior, checked writes, and wear-conscious persistence. Keep gamepad profiles protocol-independent using the btpad.md logical names; keep keyboard maps separate. Add schema validation and import/export. Gate: first-run/login/save/reload/logout tests, unauthorized request rejection, profile isolation, and interrupted-save recovery on hardware.
 
 ### 4. Device usability and hardware qualification
 

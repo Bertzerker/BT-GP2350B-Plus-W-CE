@@ -12,15 +12,15 @@ const PinDef PIN_MAP[] = {
   {IN_DOWN, 3, "DOWN"},
   {IN_RIGHT, 4, "RIGHT"},
   {IN_LEFT, 5, "LEFT"},
-  {IN_A, 6, "A"},
-  {IN_B, 7, "B"},
-  {IN_X, 10, "X"},
-  {IN_Y, 11, "Y"},
-  {IN_LB, 13, "LB"},
-  {IN_RB, 12, "RB"},
-  {IN_LT, 9, "LT"},
-  {IN_RT, 8, "RT"},
-  {IN_BACK, 17, "BACK"},
+  {IN_SOUTH, 6, "South"},
+  {IN_EAST, 7, "East"},
+  {IN_WEST, 10, "West"},
+  {IN_NORTH, 11, "North"},
+  {IN_L1, 13, "L1"},
+  {IN_R1, 12, "R1"},
+  {IN_L2, 9, "L2"},
+  {IN_R2, 8, "R2"},
+  {IN_SELECT, 17, "Select"},
   {IN_START, 16, "START"},
   {IN_LS, 18, "LS"},
   {IN_RS, 19, "RS"},
@@ -30,18 +30,11 @@ const PinDef PIN_MAP[] = {
 };
 
 const char *MODE_NAMES[] = {
-  "Generic HID", "Switch (unimplemented)", "Reserved", "PS3 (unimplemented)", "DirectInput", "Keyboard", "WLAN"
+  "Generic HID", "Switch (unimplemented)", "Reserved", "PS3 USB (experimental)", "DirectInput", "Keyboard", "WLAN", "Xbox BLE (experimental)"
 };
 
-struct ButtonLabels {
-  const char *labels[IN_COUNT];
-};
-
-const ButtonLabels MODE_LABELS[] = {
-  {{"UP","DOWN","RIGHT","LEFT","A","B","X","Y","LB","RB","LT","RT","Back","Start","LS","RS","Special","Guide","-"}},
-  {{"UP","DOWN","RIGHT","LEFT","B","A","Y","X","L","R","ZL","ZR","Minus","Plus","LS","RS","Special","Home","Capture"}},
-  {{}}, // Retired mode slot; retained only to preserve stored IDs.
-  {{"UP","DOWN","RIGHT","LEFT","Cross","Circle","Square","Triangle","L1","R1","L2","R2","Select","Start","L3","R3","Special","PS","-"}},
-  {{"UP","DOWN","RIGHT","LEFT","2","3","1","4","5","6","7","8","9","10","11","12","Special","13","-"}},
-  {{"UP","DOWN","RIGHT","LEFT","z","x","a","s","v","f","c","d","Backspace","Enter","b","g","Special","Esc","-"}}
+// Protocol-independent destinations. Numeric IDs remain EEPROM-compatible.
+const char *const LOGICAL_LABELS[IN_COUNT] = {
+  "Up", "Down", "Right", "Left", "South", "East", "West", "North",
+  "L1", "R1", "L2", "R2", "Select", "Start", "LS", "RS", "Special", "Guide", "Capture"
 };

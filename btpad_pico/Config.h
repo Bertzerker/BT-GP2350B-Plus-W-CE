@@ -11,7 +11,8 @@ enum HidMode : uint8_t {
   MODE_PS3 = 3,
   MODE_DIRECTINPUT = 4,
   MODE_KEYBOARD = 5,
-  MODE_WEB = 6
+  MODE_WEB = 6,
+  MODE_XBOX_BLE = 7 // Experimental Windows XInput-compatible BLE transport.
 };
 
 enum SocdMode : uint8_t {
@@ -21,11 +22,11 @@ enum SocdMode : uint8_t {
 };
 
 inline bool isSelectableMode(HidMode mode) {
-  return mode == MODE_GAMEPAD || mode == MODE_DIRECTINPUT || mode == MODE_KEYBOARD;
+  return mode == MODE_PS3 || mode == MODE_GAMEPAD || mode == MODE_DIRECTINPUT || mode == MODE_KEYBOARD || mode == MODE_XBOX_BLE;
 }
 
 inline HidMode migrateLegacyMode(HidMode mode) {
-  return mode == MODE_SWITCH || mode == MODE_RESERVED_2 || mode == MODE_PS3 ? MODE_GAMEPAD : mode;
+  return mode == MODE_SWITCH || mode == MODE_RESERVED_2 ? MODE_GAMEPAD : mode;
 }
 
 enum InputId : uint8_t {
@@ -33,15 +34,15 @@ enum InputId : uint8_t {
   IN_DOWN,
   IN_RIGHT,
   IN_LEFT,
-  IN_A,
-  IN_B,
-  IN_X,
-  IN_Y,
-  IN_LB,
-  IN_RB,
-  IN_LT,
-  IN_RT,
-  IN_BACK,
+  IN_SOUTH,
+  IN_EAST,
+  IN_WEST,
+  IN_NORTH,
+  IN_L1,
+  IN_R1,
+  IN_L2,
+  IN_R2,
+  IN_SELECT,
   IN_START,
   IN_LS,
   IN_RS,
@@ -69,10 +70,27 @@ struct Config {
 
 constexpr uint32_t CONFIG_MAGIC = 0x42545044; // BTPD
 
+inline bool profileExists(const Config &value, uint8_t slot) {
+  return slot < 3 && value.profiles[slot].name[0] != '\0';
+}
+inline uint8_t nextProfile(const Config &value, uint8_t from, bool forward) {
+  for (uint8_t n = 1; n <= 3; ++n) {
+    uint8_t slot = (from + (forward ? n : 3 - n)) % 3;
+    if (profileExists(value, slot)) return slot;
+  }
+  return from;
+}
+inline void resetProfile(Profile &profile, const char *name) {
+  memset(&profile, 0, sizeof(profile));
+  for (size_t i = 0; i < sizeof(profile.name) - 1 && name[i]; ++i) profile.name[i] = name[i];
+  for (uint8_t i = 0; i < IN_COUNT; ++i) profile.remap[i] = i;
+  profile.turboHz = 12;
+}
+
 // Keep the existing EEPROM layout; a versioned format is a separate migration.
 inline bool isConfigValid(const Config &candidate) {
-  if (candidate.magic != CONFIG_MAGIC || candidate.defaultMode >= MODE_WEB ||
-      candidate.activeProfile >= 3) return false;
+  if (candidate.magic != CONFIG_MAGIC || (candidate.defaultMode >= MODE_WEB && candidate.defaultMode != MODE_XBOX_BLE) ||
+      !profileExists(candidate, candidate.activeProfile)) return false;
 
   const char *passwordEnd = static_cast<const char *>(
       memchr(candidate.adminPassword, '\0', sizeof(candidate.adminPassword)));
