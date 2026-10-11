@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/pinout.png" alt="pinout" width="420">
+  <img src="docs/pinout.jpg" alt="pinout" width="420">
 </p>
 
 
