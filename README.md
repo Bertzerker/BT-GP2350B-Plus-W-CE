@@ -4,6 +4,11 @@
   <img src="docs/assets/bt-gp2350b-logo.png" alt="BT-GP2350B-Plus-W-CE neon arcade controller illustration" width="420">
 </p>
 
+<p align="center">
+  <img src="docs/pinout.png" alt="pinout" width="420">
+</p>
+
+
 Bluetooth controller firmware for the **Waveshare RP2350B-Plus-W**, built with Arduino-Pico. It supports wired buttons and a digital joystick, Bluetooth gamepad/keyboard output, a Wi-Fi configuration page with a live wiring tester, and an optional SSD1306 OLED.
 
 **Status: development prototype, updated 2026-09-20.** The latest OLED firmware is flashed. The user confirms Xbox BLE now works and stays connected; Windows reports a healthy Bluetooth LE XInput device and the XInput API detects slot 0. MiSTer, repeated power-cycle reconnect and native Guide behavior still need separate checks. PS3 USB is an experimental console-test mode; PS3 Bluetooth and Switch are not implemented.
