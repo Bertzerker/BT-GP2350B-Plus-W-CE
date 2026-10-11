@@ -1,7 +1,7 @@
 # BT-GP2350B-Plus-W-CE Bluetooth Controller Firmware
 
 <p align="center">
-  <img src="docs/assets/bt-gp2350b-logo.png" alt="BT-GP2350B-Plus-W-CE neon arcade controller illustration" width="640">
+  <img src="docs/assets/bt-gp2350b-logo.png" alt="BT-GP2350B-Plus-W-CE neon arcade controller illustration" width="420">
 </p>
 
 Bluetooth controller firmware for the **Waveshare RP2350B-Plus-W**, built with Arduino-Pico. It supports wired buttons and a digital joystick, Bluetooth gamepad/keyboard output, a Wi-Fi configuration page with a live wiring tester, and an optional SSD1306 OLED.
