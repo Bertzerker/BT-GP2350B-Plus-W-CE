@@ -56,3 +56,25 @@ Updated: 2026-09-09. Work in this order; milestone completion requires the gates
 - Xbox BLE failed user tests on Windows (Code 10) and MiSTer (immediate disconnect). Added diagnostics/recovery and revised GATT database. Root cause and fix require live trace, not assumptions from Windows driver matching.
 
 2026-09-20 hardware follow-up: user confirms the flashed Xbox BLE build works and stays connected. Windows BLE XInput driver status OK and XInputGetState slot 0 observed. Keep MiSTer, Guide/trigger acceptance and repeated automatic reconnect open. PS3 USB console test remains pending.
+
+## 2026-09-21 player assignment
+
+- Implemented Special GP14 + Home/Guide GP20 reconnect, with host-owned player slots and existing Bluetooth bonds/identity retained. PS3 uses USB reconnect. Does not guarantee Player 1 or cycle slots.
+- Input/sync tests and OLED/headless builds pass; OLED image flashed. Physical shortcut checks on Windows and MiSTer remain open. Post-flash serial showed BLE pairing failures (0x3d); reconnect acceptance remains unverified. See VALIDATION.md.
+
+## 2026-09-21 OLED player feedback
+
+- Profile name only on the left; host player indicator below the connection status on the right.
+- PS3 USB decodes host player LED reports (1–7). Other current protocols show unknown (`Player: ?`) because they do not provide player-number feedback.
+- Actual Xbox BLE player display on Windows/MiSTer still needs host integration; no slot is inferred from profiles, pairing order or connection handles.
+- OLED bounds and PS3 output decoding tests pass, including truncated reports and unknown LED patterns. Physical PS3 LED-feedback acceptance remains pending.
+
+## 2026-09-22 Xbox Classic Bluetooth
+
+- Implemented separate experimental mode 8 with GP12/R1 startup shortcut, portal default selection and XB-BT display label.
+- Dedicated BTstack Classic HID transport, matching report encoder, large SDP record and 045E:02E0 Device ID; pinned Apache-2.0 descriptor reference retained.
+- Shared profile/SOCD/turbo input and reconnect shortcut preserved; Capture has local shortcuts only in this older report family.
+- 12 native suites and OLED/headless builds pass. OLED firmware flashed.
+- Open: select GP12 mode and verify Classic Windows pairing/XInput, Guide, triggers, automatic reconnect, MiSTer and XP. Initial post-flash boot still uses saved BLE mode.
+
+Classic hardware follow-up: user confirmed sync; Windows BTPad-Xbox-Classic and matching Classic XInput driver are healthy. XInput slot 0 shows buttons and isolated LT/RT presses without duplicate button bits. Remaining: full D-pad/Guide, simultaneous triggers, power-cycle reconnect, MiSTer and XP.

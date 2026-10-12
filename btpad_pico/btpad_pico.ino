@@ -10,6 +10,9 @@
 #include <JoystickBT.h>
 #include <HID_Bluetooth.h>
 #include <pico/bootrom.h>
+#include <hardware/watchdog.h>
+#include <hardware/structs/watchdog.h>
+#include "UsbSetupCommand.h"
 
 #if defined(BTPAD_REQUIRE_DISPLAY) || (!defined(BTPAD_DISABLE_DISPLAY) && __has_include(<Wire.h>) && __has_include(<Adafruit_GFX.h>) && __has_include(<Adafruit_SSD1306.h>))
 #include <Wire.h>
@@ -62,9 +65,11 @@ bool syncTap = false;
 static btstack_packet_callback_registration_t pairingEvents;
 static uint8_t pairingStatus = 0xff, authenticationStatus = 0xff;
 #include "XboxBLE.h"
+#include "XboxClassic.h"
 
 bool bluetoothConnected() {
   if (currentMode == MODE_PS3) return PS3USB::connected();
+  if (currentMode == MODE_XBOX_CLASSIC) return XboxClassic::connected();
   return currentMode == MODE_XBOX_BLE ? XboxBLE::connected() : PicoBluetoothHID.connected();
 }
 
@@ -93,12 +98,35 @@ void setBluetoothSync(bool enabled) {
   gap_discoverable_control(enabled ? 1 : 0);
   gap_connectable_control(1); // Saved hosts can reach us outside discovery.
   if (enabled) pairingStatus = authenticationStatus = 0xff;
+  if (currentMode == MODE_XBOX_CLASSIC) { if (enabled) XboxClassic::disconnect(); return; }
   if (enabled && PicoBluetoothHID.connected()) {
     hid_device_disconnect(PicoBluetoothHID.getCID());
   }
 }
 
 #include "BluetoothReconnect.h"
+
+// Player slots belong to the host. Reconnect with the same identity and bonds
+// so it can reassess this controller; it may assign the same slot again.
+void requestHostReconnect() {
+  if (currentMode == MODE_PS3) { PS3USB::reconnect(); return; }
+  setBluetoothSync(false);
+  BluetoothLock lock;
+  if (currentMode == MODE_XBOX_BLE) {
+    if (XboxBLE::connection != HCI_CON_HANDLE_INVALID) gap_disconnect(XboxBLE::connection);
+    else XboxBLE::advertise();
+  } else {
+    btstack_linked_list_iterator_t connections;
+    hci_connections_get_iterator(&connections);
+    while (btstack_linked_list_iterator_has_next(&connections)) {
+      auto *link = reinterpret_cast<hci_connection_t *>(btstack_linked_list_iterator_next(&connections));
+      if (link->address_type == BD_ADDR_TYPE_ACL && link->con_handle != HCI_CON_HANDLE_INVALID)
+        gap_disconnect(link->con_handle);
+    }
+    // Existing saved-host reconnect logic resumes after the link closes.
+  }
+  if (Serial) Serial.println("BT reconnect requested; player slot is host assigned");
+}
 
 #if BTPAD_HAS_DISPLAY
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
@@ -221,6 +249,7 @@ void initBluetooth() {
   if (currentMode == MODE_XBOX_BLE) { XboxBLE::begin(); return; }
   pairingEvents.callback = observePairing;
   hci_add_event_handler(&pairingEvents);
+  if (currentMode == MODE_XBOX_CLASSIC) { XboxClassic::begin(); return; }
   const char *name = bluetoothNames[currentMode];
   if (currentMode == MODE_KEYBOARD) {
     PicoBluetoothHID.startHID(name, name, 0x2540, 33, keyboardDescriptor, sizeof(keyboardDescriptor));
@@ -272,7 +301,9 @@ void updateDisplay() {
     BluetoothLock lock;
     connected = bluetoothConnected();
   }
-  drawControllerDisplay(display, config, currentMode, physical, bluetoothSync, connected);
+  // Current Bluetooth descriptors have no host player-number feedback.
+  const uint8_t player = currentMode == MODE_PS3 ? PS3USB::playerNumber() : 0;
+  drawControllerDisplay(display, config, currentMode, physical, bluetoothSync, connected, player);
   display.display();
 #endif
 }
@@ -297,6 +328,10 @@ void setup() {
   initInputs();
   delay(40);
   currentMode = detectBootMode();
+  // One-shot USB request survives watchdog reset, never an EEPROM setting.
+  const bool usbWeb = watchdog_caused_reboot() && watchdog_hw->scratch[0] == 0x42545745;
+  watchdog_hw->scratch[0] = 0;
+  if (usbWeb) currentMode = MODE_WEB;
   setupDisplay();
 
   if (currentMode == MODE_WEB) {
@@ -310,6 +345,21 @@ void setup() {
 }
 
 void loop() {
+  static UsbSetupCommand usbCommand;
+  // Bound work per loop so a noisy serial sender cannot starve game reports.
+  for (uint8_t n = 0; n < 32 && Serial.available(); ++n) {
+    if (usbCommand.feed(static_cast<char>(Serial.read()))) {
+      if (currentMode == MODE_WEB) {
+        Serial.println("Web setup active: BTPad-Setup at http://192.168.4.1/");
+        continue;
+      }
+      Serial.println("Opening BTPad-Setup at http://192.168.4.1/");
+      Serial.flush();
+      watchdog_hw->scratch[0] = 0x42545745;
+      watchdog_reboot(0, 0, 50);
+      while (true) delay(1);
+    }
+  }
   scanInputs();
   if (currentMode == MODE_WEB) {
     server.handleClient();
@@ -325,12 +375,14 @@ void loop() {
   bool reportDue = static_cast<uint32_t>(millis() - lastReportMs) >= REPORT_MS;
   if (reportDue) syncTap = syncButton.takeTap();
   if (inputPipeline.scan(stableState, config, syncTap, currentMode == MODE_KEYBOARD, reportDue)) saveConfig();
+  if (inputPipeline.takeReconnect()) requestHostReconnect();
   updateTurboClock();
   logicalState = inputPipeline.report(config.profiles[config.activeProfile], turboPhase);
   if (reportDue) {
     lastReportMs = millis();
     if (currentMode == MODE_PS3) PS3USB::send(logicalState);
     else if (currentMode == MODE_XBOX_BLE) XboxBLE::send(logicalState);
+    else if (currentMode == MODE_XBOX_CLASSIC) XboxClassic::send(logicalState);
     else if (currentMode == MODE_KEYBOARD) sendKeyboardReport();
     else sendGamepadReport();
   }
@@ -338,6 +390,6 @@ void loop() {
   bool linked;
   { BluetoothLock lock; linked = bluetoothConnected(); }
   if (bluetoothSync && linked) setBluetoothSync(false);
-  if (currentMode != MODE_XBOX_BLE && currentMode != MODE_PS3) reconnectBluetooth();
+  if (currentMode != MODE_XBOX_BLE && currentMode != MODE_PS3) reconnectBluetooth(linked);
   updateDisplay();
 }

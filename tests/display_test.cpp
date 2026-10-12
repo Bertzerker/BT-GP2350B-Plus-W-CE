@@ -24,7 +24,7 @@ int main() {
   for (int i=0;i<19;++i) p.name[i]='W';
   p.turboHz=30; p.turboMask=0xfff0;
   Screen screen;
-  for (auto mode : {MODE_GAMEPAD, MODE_DIRECTINPUT, MODE_KEYBOARD, MODE_WEB}) {
+  for (auto mode : {MODE_GAMEPAD, MODE_DIRECTINPUT, MODE_KEYBOARD, MODE_WEB, MODE_XBOX_CLASSIC}) {
     for (int socd=0;socd<3;++socd) {
       p.socd=static_cast<SocdMode>(socd);
       drawControllerDisplay(screen, settings, mode, (1u<<IN_COUNT)-1, true, false);
@@ -34,5 +34,17 @@ int main() {
   }
   drawControllerDisplay(screen, settings, MODE_GAMEPAD, 0, false, true);
   assert(screen.fills==0 && screen.text.find("BT:ON")!=std::string::npos);
+  assert(screen.text.find("Player: ?")!=std::string::npos);
+  assert(screen.text.find("Profile ")==std::string::npos);
+  // Every host-reported player fits the right-hand column. Disconnect hides
+  // a previously known number; unsupported/invalid values stay unknown.
+  for (uint8_t player = 1; player <= 7; ++player) {
+    drawControllerDisplay(screen, settings, MODE_PS3, 0, false, true, player);
+    assert(screen.text.find("Player: " + std::to_string(player))!=std::string::npos);
+    drawControllerDisplay(screen, settings, MODE_PS3, 0, false, false, player);
+    assert(screen.text.find("Player: ?")!=std::string::npos);
+  }
+  drawControllerDisplay(screen, settings, MODE_PS3, 0, false, true, 255);
+  assert(screen.text.find("Player: ?")!=std::string::npos);
   puts("OLED layout passed: bounds, 19 held inputs, modes, turbo and status.");
 }

@@ -1,4 +1,5 @@
 #include "../btpad_pico/InputPipeline.h"
+#include "../btpad_pico/SyncButton.h"
 #include <assert.h>
 #include <stdio.h>
 
@@ -18,6 +19,34 @@ struct Rig {
 };
 
 int main() {
+  // Reconnect works in either press order, only once per modifier hold, with
+  // no Guide tap or long-hold pairing action even if Special is released first.
+  for (int order = 0; order < 2; ++order) for (int keyboard = 0; keyboard < 2; ++keyboard) {
+    Rig r;
+    SyncButton button;
+    uint32_t now = 0;
+    auto tick = [&]() {
+      assert(!button.update(r.keys[IN_GUIDE], now,
+                            r.keys[IN_SPECIAL] || r.pipeline.suppressed(IN_GUIDE)));
+      assert(!r.pipeline.scan(r.keys, r.config, button.takeTap(), keyboard != 0));
+      assert(r.output() == 0);
+      now += 1000;
+    };
+    r.keys[order ? IN_GUIDE : IN_SPECIAL] = true; tick();
+    assert(!r.pipeline.takeReconnect());
+    r.keys[IN_SPECIAL] = r.keys[IN_GUIDE] = true; tick();
+    assert(r.pipeline.takeReconnect());
+    assert(!r.pipeline.takeReconnect());
+    for (int i = 0; i < 5; ++i) { tick(); assert(!r.pipeline.takeReconnect()); }
+    r.keys[IN_SPECIAL] = false; tick();
+    for (int i = 0; i < 5; ++i) { tick(); assert(!r.pipeline.takeReconnect()); }
+    r.keys[IN_GUIDE] = false; tick();
+    r.keys[IN_SPECIAL] = r.keys[IN_GUIDE] = true; tick();
+    assert(r.pipeline.takeReconnect());
+    r.keys[IN_GUIDE] = false; tick();
+    r.keys[IN_GUIDE] = true; tick();
+    assert(!r.pipeline.takeReconnect()); // Must release Special to rearm.
+  }
   // All 16 directional combinations in all modes; same-scan opposites tie.
   for (int mode = 0; mode < 3; ++mode) {
     for (unsigned int bits = 0; bits < 16; ++bits) {

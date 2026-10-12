@@ -5,12 +5,15 @@
 #include <pico/unique_id.h>
 #include "PS3USB.h"
 #include "PS3Report.h"
+#include "PS3Player.h"
 
 namespace PS3USB {
 static bool active = false;
+static volatile uint8_t hostPlayer = 0;
 static PS3InputReport report = encodePS3(0);
 static PS3Features features;
 void begin() {
+  hostPlayer = 0;
   USB.disconnect();
   Serial.end(); // PS3 test mode presents a controller, without CDC serial.
   pico_unique_board_id_t unique;
@@ -26,9 +29,21 @@ void begin() {
   USB.connect();
 }
 bool connected() { return active && tud_mounted(); }
+uint8_t playerNumber() { return connected() ? hostPlayer : 0; }
+void reconnect() {
+  if (!active) return;
+  USB.disconnect();
+  delay(250);
+  active = false;
+  hostPlayer = 0;
+  send(0); // Clear queued input while detached.
+  report = encodePS3(0);
+  active = true;
+  USB.connect();
+}
 void send(uint32_t logical) {
   static uint32_t pending = 0, previous = 0;
-  if (!connected()) { pending = previous = 0; return; }
+  if (!connected()) { pending = previous = 0; hostPlayer = 0; return; }
   pending |= logical & ~previous; previous = logical;
   mutex_enter_blocking(&USB.mutex);
   report = encodePS3(logical | pending);
@@ -48,5 +63,9 @@ extern "C" uint16_t tud_hid_get_report_cb(uint8_t, uint8_t id, hid_report_type_t
 }
 extern "C" void tud_hid_set_report_cb(uint8_t, uint8_t id, hid_report_type_t type, const uint8_t *buffer, uint16_t length) {
   if (PS3USB::active && type == HID_REPORT_TYPE_FEATURE) PS3USB::features.set(id, buffer, length);
-  // Output (LED/rumble) is accepted; this hardware has no rumble motors.
+  if (PS3USB::active && type == HID_REPORT_TYPE_OUTPUT) {
+    uint8_t player = 0;
+    if (decodePS3Player(id, buffer, length, player)) PS3USB::hostPlayer = player;
+  }
+  // Rumble is accepted; this hardware has no motors.
 }

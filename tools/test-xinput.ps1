@@ -15,7 +15,7 @@ public static class BTPadXInput {
 }
 "@
 }
-Write-Host 'Checking Windows XInput slots. Press directions and both triggers. Guide needs a separate Game Bar/Steam check.'
+Write-Host 'Checking host-assigned players (Player 1 = XInput slot 0). Press a button to identify your controller. Games can use a different player order.'
 $watch = [Diagnostics.Stopwatch]::StartNew()
 $last = @{}
 $seen = @{}
@@ -24,9 +24,9 @@ do {
     $state = New-Object BTPadXInput+State
     if ([BTPadXInput]::XInputGetState($slot, [ref]$state) -eq 0) {
       $seen[$slot] = $true
-      $line = 'Slot {0}: Buttons=0x{1:X4} LT={2} RT={3} Left=({4},{5}) Right=({6},{7})' -f $slot,$state.Gamepad.Buttons,$state.Gamepad.LeftTrigger,$state.Gamepad.RightTrigger,$state.Gamepad.LX,$state.Gamepad.LY,$state.Gamepad.RX,$state.Gamepad.RY
+      $line = 'Player {0} (slot {1}): Buttons=0x{2:X4} LT={3} RT={4} Left=({5},{6}) Right=({7},{8})' -f ($slot + 1),$slot,$state.Gamepad.Buttons,$state.Gamepad.LeftTrigger,$state.Gamepad.RightTrigger,$state.Gamepad.LX,$state.Gamepad.LY,$state.Gamepad.RX,$state.Gamepad.RY
       if ($last[$slot] -ne $line) { Write-Output $line; $last[$slot] = $line }
-    } elseif ($last.ContainsKey($slot)) { Write-Output "Slot $slot disconnected"; $last.Remove($slot) }
+    } elseif ($last.ContainsKey($slot)) { Write-Output ("Player {0} (slot {1}) disconnected" -f ($slot + 1), $slot); $last.Remove($slot) }
   }
   Start-Sleep -Milliseconds 100
 } while ($watch.Elapsed.TotalSeconds -lt $Seconds)

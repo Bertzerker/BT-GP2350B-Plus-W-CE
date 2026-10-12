@@ -30,7 +30,7 @@ const PinDef PIN_MAP[] = {
 };
 
 const char *MODE_NAMES[] = {
-  "Generic HID", "Switch (unimplemented)", "Reserved", "PS3 USB (experimental)", "DirectInput", "Keyboard", "WLAN", "Xbox BLE (experimental)"
+  "Generic HID", "Switch (unimplemented)", "Reserved", "PS3 USB (experimental)", "DirectInput", "Keyboard", "WLAN", "Xbox BLE (experimental)", "Xbox Classic BT (experimental)"
 };
 
 // Protocol-independent destinations. Numeric IDs remain EEPROM-compatible.

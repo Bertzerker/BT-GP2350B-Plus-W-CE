@@ -205,6 +205,11 @@ int main() {
   server.request("/", HTTP_GET, {{"edit", "invalid"}}, cookie());
   assert(server.status == 400);
   Fields fields = settings(2);
+  fields["mode"] = "8";
+  server.request("/save", HTTP_POST, fields, cookie());
+  assert(server.status == 303 && config.defaultMode == MODE_XBOX_CLASSIC);
+  server.request("/", HTTP_GET, {}, cookie());
+  assert(contains(server.body, "Xbox Classic BT (experimental)"));
   for (int unavailable : {1, 2}) {
     fields["mode"] = String(unavailable);
     server.request("/save", HTTP_POST, fields, cookie());

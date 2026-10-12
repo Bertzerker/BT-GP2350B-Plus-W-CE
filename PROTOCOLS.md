@@ -1,12 +1,13 @@
 # Output protocol status and next implementation
 
-Updated 2026-09-09 after physical tests and user feedback.
+Updated 2026-09-22 after physical tests and user feedback.
 
 | Output | Current status | Acceptance requirement |
 | --- | --- | --- |
 | Generic HID / DirectInput | DirectInput user-confirmed working. Generic HID now sends a real hat and trigger axes without duplicate button bits; saved-host reconnect added | Verify updated Generic HID on Windows/MiSTer and reconnect across ordinary power cycles; DirectInput face numbering now follows btpad.md |
 | Keyboard | Implemented; shared SOCD logic tested on desktop | Pair and verify arrows, remaps, rollover and releases on hardware |
 | Windows XInput over Bluetooth | User confirmed latest build working; Windows driver healthy and XInput API enumeration observed | Windows XInput API detects device, independent LT/RT work together, native Guide reaches Game Bar/Steam with host settings enabled |
+| Xbox Classic Bluetooth | Mode 8 / GP12, Windows pairing and healthy Classic XInput driver verified; button and separate trigger activity observed | MiSTer/XP, full D-pad/Guide, simultaneous triggers and repeated reconnect |
 | PS3 | Experimental USB DS3 reports/features; Bluetooth not implemented | Real console pairing, PS button, input/feature/output reports, reconnect |
 | Switch | Not implemented | Native controller pairing, commands/reports, Home/Capture and reconnect |
 
@@ -57,3 +58,21 @@ PS3 USB uses a descriptor and feature byte arrays adapted from [GP2040-CE commit
 ### Windows result after flashing
 
 The user confirms Xbox BLE works and stays connected. Windows read-only device inspection shows BTPad-Xbox and Bluetooth LE XINPUT compatible input device both OK. XInputGetState succeeds in slot 0. A 55-second serial observation remained connected with sync off. Because another Xbox device is also installed, the API slot alone is not a unique identity proof; the matching healthy BTPad BLE entry and user test corroborate it. Trigger endpoints, Guide, MiSTer and repeated power-cycle reconnect still need explicit acceptance. No single root cause is proven because the revised build changes several startup details together.
+
+## OLED player feedback
+
+The profile line shows only the name (up to 12 characters), with `Player: ?` beneath the connection status. Unknown is intentional: Xbox BLE output report 3 contains rumble fields only, and the current Classic gamepad/keyboard descriptors provide no player-number feedback. Neither a connection handle nor a saved profile identifies a host player slot. Accurate Xbox BLE game/player order would require an additional host feedback mechanism; it is not implemented.
+
+PS3 USB output report 1 carries a player LED bitmap at wire byte 10, decoded as 1–7 for the standard PS3 patterns. Unknown/all-on/all-off patterns display `?`, as does a disconnected controller. This is host LED feedback and can differ from a game's player order. Format reference: [Linux hid-sony.c](https://github.com/torvalds/linux/blob/master/drivers/hid/hid-sony.c), `sixaxis_output_report` and `sixaxis_set_leds_from_id`. Rumble remains ignored.
+
+## Experimental Xbox Classic Bluetooth — 2026-09-22
+
+Mode 8 / startup GP12 (R1), OLED XB-BT, pairing name BTPad-Xbox-Classic. Selectable as a saved default in the portal. Appended enum value preserves existing EEPROM offsets/mode IDs. Other startup buttons are unchanged.
+
+Uses BR/EDR HID with Device ID USB-source 0x045E:0x02E0, revision 0x0903; dedicated 1024-byte HID SDP buffer and project-owned BTstack callbacks, not the generic core helper. The unmodified Xbox firmware-4.8 HID descriptor is extracted from Bluepad32 revision `4adc6d2f85576b833679d5414f23920021494ce1`, parser/uni_hid_parser_xboxone.c, under Apache-2.0. License retained in third_party/Bluepad32-LICENSE.txt. This is a reference-based experimental implementation, not a byte-for-byte capture of the user's SN30 Pro+.
+
+Report 1: 16-byte payload, centered sticks, independent 10-bit triggers, 8-way/null hat, Xbox buttons and Guide; Select uses AC Back in the final byte. Report 2 AC Home is neutral/unused; report 4 is a fixed battery-strength placeholder, not a measurement. Rumble output report 3 is accepted and retained for readback; no motors are fitted. Capture is not available as a native button in this family; the physical Capture profile/SOCD shortcuts still work. No player-number feedback is declared or inferred.
+
+GP20 controls pairing; bonded-host reconnect runs outside sync using the shared Classic scheduler. Special+Home requests a reconnect. Nonblocking CAN_SEND_NOW transmission retains short press edges until sent and clears state on disconnect/suspend. Input, output and unsupported feature requests are bounded by the descriptor and callbacks. Shared mappings/SOCD/turbo feed the encoder unchanged. USB remains the existing diagnostic interface in Bluetooth modes, not an additional XInput controller.
+
+Acceptance requires Windows native XInput, independent/simultaneous triggers, D-pad diagonals, Guide, Select, repeated power-cycle reconnect and MiSTer behavior. XP needs its own compatible API/driver test; the current Windows diagnostic uses xinput1_4.dll and is not suitable for XP. No Xbox console support is claimed.

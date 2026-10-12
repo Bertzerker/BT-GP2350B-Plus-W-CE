@@ -43,7 +43,7 @@ int main() {
   value = validConfig();
   for (int mode = 0; mode < 256; ++mode) {
     value.defaultMode = static_cast<HidMode>(mode);
-    assert(isConfigValid(value) == (mode < MODE_WEB || mode == MODE_XBOX_BLE));
+    assert(isConfigValid(value) == (mode < MODE_WEB || mode == MODE_XBOX_BLE || mode == MODE_XBOX_CLASSIC));
   }
   value = validConfig();
   for (int index = 0; index < 256; ++index) {

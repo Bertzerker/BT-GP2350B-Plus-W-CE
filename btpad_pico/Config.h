@@ -12,7 +12,8 @@ enum HidMode : uint8_t {
   MODE_DIRECTINPUT = 4,
   MODE_KEYBOARD = 5,
   MODE_WEB = 6,
-  MODE_XBOX_BLE = 7 // Experimental Windows XInput-compatible BLE transport.
+  MODE_XBOX_BLE = 7, // Experimental Windows XInput-compatible BLE transport.
+  MODE_XBOX_CLASSIC = 8
 };
 
 enum SocdMode : uint8_t {
@@ -22,7 +23,7 @@ enum SocdMode : uint8_t {
 };
 
 inline bool isSelectableMode(HidMode mode) {
-  return mode == MODE_PS3 || mode == MODE_GAMEPAD || mode == MODE_DIRECTINPUT || mode == MODE_KEYBOARD || mode == MODE_XBOX_BLE;
+  return mode == MODE_PS3 || mode == MODE_GAMEPAD || mode == MODE_DIRECTINPUT || mode == MODE_KEYBOARD || mode == MODE_XBOX_BLE || mode == MODE_XBOX_CLASSIC;
 }
 
 inline HidMode migrateLegacyMode(HidMode mode) {
@@ -89,7 +90,7 @@ inline void resetProfile(Profile &profile, const char *name) {
 
 // Keep the existing EEPROM layout; a versioned format is a separate migration.
 inline bool isConfigValid(const Config &candidate) {
-  if (candidate.magic != CONFIG_MAGIC || (candidate.defaultMode >= MODE_WEB && candidate.defaultMode != MODE_XBOX_BLE) ||
+  if (candidate.magic != CONFIG_MAGIC || (candidate.defaultMode >= MODE_WEB && !isSelectableMode(candidate.defaultMode)) ||
       !profileExists(candidate, candidate.activeProfile)) return false;
 
   const char *passwordEnd = static_cast<const char *>(

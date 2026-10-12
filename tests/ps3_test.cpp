@@ -1,7 +1,25 @@
 #include "../btpad_pico/PS3Report.h"
+#include "../btpad_pico/PS3Player.h"
 #include <assert.h>
 #include <stdio.h>
 int main() {
+  uint8_t ledReport[49] = {1}, player = 0;
+  const uint8_t masks[] = {0, 2, 4, 8, 16, 18, 20, 24};
+  for (uint8_t p = 0; p < 8; ++p) {
+    ledReport[10] = masks[p];
+    assert(decodePS3Player(0, ledReport, sizeof(ledReport), player) && player == p);
+    assert(decodePS3Player(1, ledReport + 1, sizeof(ledReport) - 1, player) && player == p);
+  }
+  for (unsigned n = 0; n < 11; ++n) {
+    player = 3;
+    assert(!decodePS3Player(0, ledReport, static_cast<uint16_t>(n), player) && player == 3);
+  }
+  assert(!decodePS3Player(2, ledReport + 1, 48, player));
+  assert(!decodePS3Player(1, nullptr, 48, player));
+  ledReport[10] = 0x1e; // All LEDs/pairing is not a confirmed slot.
+  assert(decodePS3Player(0, ledReport, 49, player) && player == 0);
+  ledReport[10] = 0x20; // Host turns every LED off.
+  assert(decodePS3Player(0, ledReport, 49, player) && player == 0);
   const auto neutral = encodePS3(0);
   assert(sizeof(neutral) == 49 && neutral.bytes[0] == 1);
   for (int i = 6; i < 10; ++i) assert(neutral.bytes[i] == 128);

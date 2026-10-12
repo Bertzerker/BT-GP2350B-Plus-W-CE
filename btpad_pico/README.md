@@ -75,12 +75,15 @@ Hold one button while powering the board:
 | GP09 | Keyboard |
 | GP10 | Xbox BLE |
 | GP11 | DirectInput |
+| GP12 | Xbox Classic Bluetooth (experimental) |
 | GP14 | WLAN setup portal |
 | GP20 | USB firmware flashing |
 
 With no button held, the saved default is used. GP20 flashing has highest priority, followed by GP14 setup; hold only one mode button.
 
 ## Runtime shortcuts
+
+- Special GP14 + Home/Guide GP20: reconnect using the existing identity and pairing (USB reconnect in PS3 mode). The host decides the player slot and may keep the same one. Release both buttons to repeat; the chord does not send Guide or toggle pairing. Classic Bluetooth may take about 10 seconds to reconnect.
 
 - Capture GP21 + Left/Right: previous/next existing profile.
 - Capture GP21 + Up/Down: cycle SOCD forward/backward.
@@ -196,3 +199,11 @@ Hold a startup button while connecting power: GP06 Generic HID, GP08 PS3 USB, GP
 **PS3 USB (experimental)** is a USB-only console test mode with a dedicated 49-byte DS3 report and feature responses adapted from GP2040-CE. Use a data cable to the PS3 and a short GP20 tap for PS. It does not pair over Bluetooth. USB serial is absent in this mode; GP20-at-startup still enters flashing. Motors/motion sensing are not fitted. Console acceptance is pending.
 
 **Xbox BLE:** Windows selects xinputhid.inf but the tested earlier build fails with Code 10 / 0xC00000E5. MiSTer also disconnects just after pairing. The revised build adds Generic Attribute service, encrypted Report Map reads, pairing/subscription/disconnect diagnostics, encryption-state checks and a 30-second incomplete-HID timeout. The user confirms the revised build works in Windows; its BLE driver is healthy and XInput API enumeration succeeds. The exact root cause is not isolated. MiSTer and power-cycle reconnect remain pending. Remove the stale BTPad-Xbox host pairing after flashing, boot with GP10, release, then hold GP20 for three seconds to pair again. Keep USB connected for the serial trace. Verify XInput with tools/test-xinput.ps1 and then test reconnect without sync.
+
+### OLED profile and player line
+
+The left side displays the profile name only, shortened to 12 characters if needed. Beneath BT/USB status, `Player: ?` means unavailable. PS3 USB shows 1–7 when a host player LED command provides that number. Current Bluetooth modes cannot obtain the host player assignment from their reports, so they show `?`; this is not a default Player 1. The old P1/P2/P3 label referred to profiles.
+
+## Xbox Classic Bluetooth test mode
+
+Hold GP12 (R1) at startup and release after boot: OLED XB-BT. Hold GP20 for three seconds to pair BTPad-Xbox-Classic. GP10 still selects Xbox BLE. The portal also offers Xbox Classic BT as a saved default. This experimental Classic Xbox format reuses gamepad profiles, SOCD and turbo; Capture only retains local shortcuts, with no native Capture report. Windows/XP/MiSTer acceptance and reconnect require physical testing. See PROTOCOLS.md for implementation and reference details.

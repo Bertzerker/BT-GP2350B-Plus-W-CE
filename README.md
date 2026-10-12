@@ -6,7 +6,7 @@
 
 Bluetooth controller firmware for the **Waveshare RP2350B-Plus-W**, built with Arduino-Pico. It supports wired buttons and a digital joystick, Bluetooth gamepad/keyboard output, a Wi-Fi configuration page with a live wiring tester, and an optional SSD1306 OLED.
 
-**Status: development prototype, updated 2026-09-20.** The latest OLED firmware is flashed. The user confirms Xbox BLE now works and stays connected; Windows reports a healthy Bluetooth LE XInput device and the XInput API detects slot 0. MiSTer, repeated power-cycle reconnect and native Guide behavior still need separate checks. PS3 USB is an experimental console-test mode; PS3 Bluetooth and Switch are not implemented.
+**Status: development prototype, updated 2026-09-22.** The latest OLED firmware is flashed. Xbox BLE was user-confirmed working. The new Xbox Classic Bluetooth mode also pairs with a healthy Windows XInput driver; native XInput detects button activity and independent trigger presses in slot 0. MiSTer, XP, repeated power-cycle reconnect and native Guide behavior still need separate checks. PS3 USB is an experimental console-test mode; PS3 Bluetooth and Switch are not implemented.
 
 ## Current support
 
@@ -15,6 +15,7 @@ Bluetooth controller firmware for the **Waveshare RP2350B-Plus-W**, built with A
 | DirectInput | User confirmed earlier operation; face-button numbering now follows btpad.md (West 1, South 2, East 3). |
 | Generic HID | Eight-direction POV hat and independent Z/Rz triggers without duplicate trigger buttons. Desktop tests pass; latest Windows/MiSTer checks pending. |
 | Xbox BLE | User confirmed working/stable on the latest build; Windows driver healthy and XInput API enumeration observed. MiSTer/reconnect/Guide acceptance pending. |
+| Xbox Classic Bluetooth | Experimental, GP12 startup. Windows Classic XInput driver healthy; buttons and separate trigger presses observed through native XInput. XP/MiSTer/reconnect/Guide checks pending. |
 | PS3 USB | Experimental DS3 reports and feature responses implemented; console test pending. Bluetooth PS3 not implemented. |
 | Keyboard | Separate full keyboard map per profile, including modifiers, navigation, keypad and F1–F24; hardware validation pending. |
 | Bluetooth sync | Hold GP20 for 3 seconds to toggle pairing/discovery. Basic pairing has been confirmed. |
@@ -31,6 +32,8 @@ The inputs are digital switches, so trigger axes have only released and fully pr
 
 ## Profiles and shortcuts
 
+The OLED shows the profile name (for example `Alt 1`) on the left and `Player: ?` below the connection status on the right. `?` means the host's player number is unavailable, not Player 1. Current Xbox BLE, Generic HID, DirectInput and keyboard protocols do not report player assignment to the firmware. PS3 USB can show 1–7 from host player LED commands; a game's own order can differ. Older OLED labels `P1` / `P2` / `P3` meant mapping profiles, never player slots. Long profile names are shortened to 12 characters on the OLED only.
+
 The portal can create and delete profiles within three saved slots. Delete an unused slot before adding a new one when all three are full. Deleting the active profile selects another; the last remaining profile cannot be deleted. Each profile owns a separate keyboard map. Existing saved profiles are preserved.
 
 | Hold with joystick | Action |
@@ -39,26 +42,55 @@ The portal can create and delete profiles within three saved slots. Delete an un
 | Capture (GP21) + Up / Down | Next / previous SOCD mode |
 | Special (GP14) + Up / Down | Increase / decrease turbo speed, 2–30 Hz |
 | Special (GP14) + game button | Toggle that button's turbo |
+| Special (GP14) + Home / Guide (GP20) | Reconnect with the existing pairing; ask the host to reassess the player slot |
 
 Each modifier hold performs one action; release before the next shortcut. Capture alone sends on release, so shortcuts do not also send Capture to the game. Shortcut inputs remain suppressed until released.
 
-Startup buttons, held while plugging in: **GP06 Generic HID, GP08 PS3 USB, GP09 Keyboard, GP10 Xbox BLE, GP11 DirectInput, GP14 setup, GP20 flashing**. GP07 is reserved for future Switch support and currently leaves the saved default in use. With no button held, the saved default applies.
+Player slots are assigned by the console/computer; the firmware does not force Player 2. Special + Home briefly disconnects and reconnects (USB in PS3 mode), preserving the controller identity and Bluetooth bonds. It does not send Home or enter pairing mode. Release both buttons before repeating. The host may assign the same slot again: this is not guaranteed Player 1 or P1–P4 cycling. Classic Bluetooth reconnect may take about 10 seconds; BLE reconnect timing depends on the host. Windows XInput assigns its indices automatically and does not permit changing them through XInput ([Microsoft documentation](https://learn.microsoft.com/en-us/windows/win32/xinput/getting-started-with-xinput)); games and MiSTer may use their own player order.
+
+Startup buttons, held while plugging in: **GP06 Generic HID, GP08 PS3 USB, GP09 Keyboard, GP10 Xbox BLE, GP11 DirectInput, GP12 Xbox Classic Bluetooth, GP14 setup, GP20 flashing**. GP07 is reserved for future Switch support and currently leaves the saved default in use. With no button held, the saved default applies.
+
+**Experimental Xbox Classic Bluetooth:** hold **GP12 (R1)** while plugging in, then release it. The OLED shows **XB-BT**. Hold GP20 for three seconds and pair **BTPad-Xbox-Classic**. This uses the Classic Xbox HID family associated with legacy 8BitDo XInput mode; it is a separate mode from Xbox BLE, with the same shared gamepad profiles. It can also be saved as the default in the web portal. Host compatibility, including XP and MiSTer, is not established by a successful firmware build. Capture has no native report in this older protocol but its profile/SOCD shortcuts still work; player assignment remains unknown on the OLED.
 
 ## Getting started
 
 1. Wire inputs between their GPIO and GND; internal pull-ups are enabled. See the [GPIO map and controls](btpad_pico/README.md).
-2. Hold **GP14 at power-on** to enter setup. Connect to **BTPad-Setup** and open **http://192.168.4.1/**.
+2. Hold **GP14 at power-on** to enter setup. Alternatively, with USB connected in a Bluetooth or keyboard mode, run `./tools/enter-web-setup.ps1 -Port COM10` (replace `COM10` with the board's port), or send `web` followed by a newline at 115200 baud. This restarts into setup once without changing your saved default. Connect to **BTPad-Setup** and open **http://192.168.4.1/**. Unplug and reconnect to return to the saved default.
 3. On a fresh configuration, the Wi-Fi and admin password is **`changeme`**. Replace it when prompted. An existing saved password remains in use; Wi-Fi adopts a changed password on the next restart.
 4. In **Profile mapper**, GPIO labels light up while inputs are held. Choose the default mode and restart with no buttons held.
 5. Hold **GP20 for 3 seconds** to enable Bluetooth sync and pair from the host. Pairing closes automatically once connected; bonded hosts can then reconnect without a sync hold.
 
-Boot overrides: **GP06 = Generic HID**, **GP09 = Keyboard**, **GP14 = setup**. GP08 selects experimental PS3 USB, GP10 Xbox BLE, and GP11 DirectInput. GP07 is reserved for unimplemented Switch support. Wi-Fi setup and Bluetooth play run in separate boot modes.
+Boot overrides: **GP06 = Generic HID**, **GP09 = Keyboard**, **GP14 = setup**. GP08 selects experimental PS3 USB, GP10 Xbox BLE, GP11 DirectInput, and GP12 Xbox Classic Bluetooth. GP07 is reserved for unimplemented Switch support. Wi-Fi setup and Bluetooth play run in separate boot modes.
 
 **Hold GP20 at power-on to enter USB firmware flashing mode.** This takes priority over all boot overrides. In normal play, GP20 short taps send Guide and a three-second hold toggles sync; GP21 is Capture, sent on release unless used in a shortcut. The new boot shortcut becomes available only after installing this update.
 
 With the display fitted, use the **`-WithDisplay`** build. Its GP2040-CE-inspired screen shows mode, Bluetooth status, profile, live D-pad/buttons, turbo rings/rate and SOCD; setup mode shows the Wi-Fi name and URL. The expected display remains a 128×64 SSD1306 at `0x3C` on GP00/GP01. Hardware display and GP20 boot/sync checks remain pending.
 
 After the latest update, test Generic HID's POV directions and trigger isolation, then pair once and power-cycle without sync to test reconnect. Redefine the controller inputs on MiSTer after changing direction-report behavior.
+
+## OLED display
+
+Normal controller mode shows the active protocol, profile name, Bluetooth status, player indicator, live inputs, turbo speed and SOCD mode. `Player: ?` means the host has not provided a player number.
+
+<img src="docs/Input%20Display.jpg" alt="OLED in Generic HID mode showing profile Alt 1, Bluetooth status, live inputs, turbo and SOCD settings" width="300">
+
+Setup mode shows the **BTPad-Setup** Wi-Fi network and the web portal address, **http://192.168.4.1/**.
+
+<img src="docs/BTPad-Setup.jpg" alt="OLED in Wi-Fi setup mode showing the BTPad-Setup network and web portal IP address 192.168.4.1" width="350">
+
+## BTPad-Setup screenshots
+
+Manage profiles, choose the default controller mode, and configure turbo and SOCD.
+
+<img src="docs/btpad-setup-profiles.png" alt="BTPad-Setup profile management, default mode, turbo speed and SOCD settings" width="420">
+
+Map GPIO inputs to shared controller buttons and check wiring with live input highlighting.
+
+<img src="docs/btpad-setup-mapper.png" alt="BTPad-Setup profile mapper with GPIO inputs, button mappings and turbo options" width="420">
+
+Change the setup password and sign out.
+
+<img src="docs/btpad-setup-password.png" alt="BTPad-Setup password change and sign-out controls" width="420">
 
 ## Build and test
 

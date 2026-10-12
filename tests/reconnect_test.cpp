@@ -35,17 +35,17 @@ struct {
 } Serial;
 #include "../btpad_pico/BluetoothReconnect.h"
 int main() {
-  reconnectBluetooth(); assert(calls == 0);
-  testNow = 10000; reconnectBluetooth(); assert(calls == 1 && testSelected == 1);
-  testNow += 60000; reconnectBluetooth(); assert(calls == 1); // Pending ACL is not overwritten.
-  testNow += 20000; reconnectBluetooth(); assert(calls == 1 && disconnects == 1);
-  busy = false; reconnectBluetooth(); assert(calls == 2 && testSelected == 2);
-  busy = false; bluetoothSync = true; testNow += 10000; reconnectBluetooth(); assert(calls == 2);
-  bluetoothSync = false; testNow += 9999; reconnectBluetooth(); assert(calls == 2);
-  ++testNow; reconnectBluetooth(); assert(calls == 3 && testSelected == 1);
-  busy = false; connected = true; testNow += 10000; reconnectBluetooth(); assert(calls == 3);
-  connected = false; hosts = 0; testNow += 10000; reconnectBluetooth(); assert(calls == 3);
-  hosts = 1; testNow = UINT32_MAX - 1000; bluetoothSync = true; reconnectBluetooth();
-  bluetoothSync = false; testNow += 10000; reconnectBluetooth(); assert(calls == 4 && testSelected == 1);
+  reconnectBluetooth(connected); assert(calls == 0);
+  testNow = 10000; reconnectBluetooth(connected); assert(calls == 1 && testSelected == 1);
+  testNow += 60000; reconnectBluetooth(connected); assert(calls == 1); // Pending ACL is not overwritten.
+  testNow += 20000; reconnectBluetooth(connected); assert(calls == 1 && disconnects == 1);
+  busy = false; reconnectBluetooth(connected); assert(calls == 2 && testSelected == 2);
+  busy = false; bluetoothSync = true; testNow += 10000; reconnectBluetooth(connected); assert(calls == 2);
+  bluetoothSync = false; testNow += 9999; reconnectBluetooth(connected); assert(calls == 2);
+  ++testNow; reconnectBluetooth(connected); assert(calls == 3 && testSelected == 1);
+  busy = false; connected = true; testNow += 10000; reconnectBluetooth(connected); assert(calls == 3);
+  connected = false; hosts = 0; testNow += 10000; reconnectBluetooth(connected); assert(calls == 3);
+  hosts = 1; testNow = UINT32_MAX - 1000; bluetoothSync = true; reconnectBluetooth(connected);
+  bluetoothSync = false; testNow += 10000; reconnectBluetooth(connected); assert(calls == 4 && testSelected == 1);
   puts("Reconnect scheduling passed: saved hosts, in-flight guard, sync, no bonds and clock rollover.");
 }

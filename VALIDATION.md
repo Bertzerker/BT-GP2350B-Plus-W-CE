@@ -1,5 +1,11 @@
 # Validation record
 
+## USB web setup — 2026-10-12
+
+Added the physical USB serial `web` command and `tools/enter-web-setup.ps1`. A one-shot watchdog marker selects setup without writing the saved default or credentials. Sending the command in setup confirms its active state. PS3 USB mode has no serial interface.
+
+All 13 native test suites pass, including command matching, CRLF, overflow and recovery. OLED build passes: 648,364 program bytes, 98,352 static RAM bytes; UF2 SHA-256 `CD6414DA9887DFA687BFC76B321F28A7A981288813FE77A49E0C0B2134EA7324`. Installed on the verified RP2350 bootloader drive J: after a USB 1200-baud reset. COM10 returned, accepted `web`, and after reboot responded `Web setup active: BTPad-Setup at http://192.168.4.1/`. Wi-Fi/browser access was not independently checked on this PC.
+
 Date: 2026-09-09. Firmware is a development prototype. The headless build was flashed to the connected RP2350 with user authorization.
 
 ## Latest source and build status
@@ -148,3 +154,43 @@ User reported earlier Xbox BLE Code 10 / event 411 / 0xC00000E5 in Windows, and 
 PS3 is a USB-only experimental mode, selected with GP08. Console acceptance and PS3 Bluetooth are not verified/implemented respectively. Existing configuration layout remains unchanged; empty names mark deleted slots. Keyboard maps are a versioned checksummed extension. The USB keyboard helper was removed to avoid its strong SET_REPORT callback conflicting with PS3; Classic keyboard now sends its own raw reports, and the sole joystick helper uses report ID 1. Re-pair Classic modes after flashing if a host cached the previous report ID.
 
 User acceptance: after the Windows Xbox BLE checks, the user reported that it works well for now and requested committing this state to GitHub. This does not independently verify MiSTer, power-cycle reconnect or PS3 console behavior.
+
+## Host player assignment and reconnect shortcut — 2026-09-21
+
+Player assignment remains host-controlled. Special GP14 + Home/Guide GP20 now requests a reconnect, preserving identity and bonds, without promising a different slot. Bluetooth uses its existing saved-host recovery/advertising; PS3 USB detaches and reconnects. No mode, profile or password changes are saved by this shortcut.
+
+All 11 desktop C++ suites pass. Added input/sync integration checks cover either button press order, keyboard/gamepad routing, once-per-hold consumption, rearming, long holds, and no Guide/pairing leakage when Special is released first. The Windows diagnostic helper now explicitly labels Player 1 as XInput slot 0. Physical shortcut/player reassignment checks remain pending on Windows and MiSTer.
+
+Both builds pass: OLED 646684 bytes program / 97160 RAM, SHA256 `456EF49E2BCEF59C5E108A2794317F8F652570E37EF6FD2F5A441B9DFD8FF8FB`; headless 632472 bytes program / 96868 RAM, SHA256 `268830A4543E32B51DBB3151D57E922C8A78AEA3E373CC022B7484BB9387C05A`. Logs: `.build/compile-player-reconnect-display.log` and `.build/compile-player-reconnect-headless.log`.
+
+Verified RP2350 bootloader on I: and copied the OLED image successfully. COM10 returned and produced firmware diagnostics. Post-flash trace showed sync enabled, repeated BLE pairing/disconnect status 0x3d, and no completed HID connection; the subsequent serial read was canceled. Connection and shortcut acceptance are not verified by this flash. A fresh host pairing may be needed after flashing; the cause of this trace has not been isolated.
+
+## OLED profile label clarification — 2026-09-21
+
+The OLED P1/P2/P3 label was generated from `settings.activeProfile + 1`; it never represented the host player slot. Replaced it with explicit `Profile 1/2/3` and limited the adjacent name to 11 characters to fit the display. Updated the README. All 11 desktop suites pass, including the existing display bounds check with a maximum-length profile name.
+
+Live Windows inspection shows BTPad-Xbox and its BLE XInput driver both OK. During the requested BTPad-only button test, activity (buttons and triggers) appeared on XInput slot 0 / Player 1. No other XInput slot was observed, although Windows also lists another USB HID game controller and a Classic Bluetooth XInput device. Device presence alone does not establish an active XInput slot. This check does not verify MiSTer game-specific player order. The prior reconnect change cannot change the selected profile and therefore does not change the old P2 label.
+
+## Profile name and host player indicator — 2026-09-21
+
+OLED now displays only the profile name (12-character limit) at x=0, with `Player: ?` at x=74 directly beneath connection status. Unknown is never replaced with an assumed Player 1. Xbox BLE/Classic gamepad/keyboard do not provide player-slot feedback in their current descriptors. PS3 USB reads host output report 1 LED patterns for 1–7; disconnected, unknown or all-on patterns show `?`. Host LED assignment does not establish a game's independent player order.
+
+All 11 desktop suites pass. New checks cover PS3 control/interrupt output framing, short/malformed reports, LED patterns, and OLED known/unknown/disconnected values within the 128x64 bounds. An initial display overflow was caught and fixed by aligning both status/player columns at x=74. Actual PS3 host feedback remains untested.
+
+OLED build: 646836 bytes program, 97160 RAM, SHA256 `6F0B0C3F291A64893084C07159CAC50CD803D65D1EBAD6FD12B88319AFC681B8`. Headless: 632640 bytes program, 96872 RAM, SHA256 `6094665406229F2DE5F8729C519AFE92843FC5BDF2CE8E8A3F28E6314FFEAABC`. Both builds pass; logs `.build/compile-player-indicator-display.log` and `.build/compile-player-indicator-headless.log`. Reverified RP2350 bootloader on I:, copied the OLED UF2 successfully and observed COM10 return.
+
+## Xbox Classic Bluetooth implementation — 2026-09-22
+
+Added experimental mode 8, startup GP12/R1, portal default selection and OLED XB-BT label. Existing mode IDs and config layouts are preserved. Uses a dedicated Classic HID BTstack transport with USB-source VID/PID 045E:02E0 and a 1024-byte SDP buffer. Reference descriptor is Xbox firmware 4.8 from pinned Bluepad32; this is not an exact SN30 Pro+ traffic capture. See PROTOCOLS.md for details and limitations.
+
+All 12 desktop C++ suites pass, including added Classic descriptor/report lengths, trigger isolation, Select/Guide/Capture behavior, all hat directions, queued short taps and state clearing. Existing startup table tests exercise GP12, config validation checks all 256 mode values, portal tests save/display mode 8, and OLED bounds cover XB-BT. The initial compile caught the core's renamed Bluetooth HID enum type; corrected callback signatures to hid_report_type_t_bt.
+
+OLED build: 647884 bytes program / 98324 RAM, SHA256 `AF3556B19A1E37A07EED5F6A0502A1281CC15598013D7493F3235CF754C3CB4E`. Headless: 633688 bytes program / 98036 RAM, SHA256 `E54B8B3B41BFAA61D9BB697F7B520CF8AFD681834384F9F549E9A8D8913D6A9A`. Logs: `.build/compile-xbox-classic-display.log` and `.build/compile-xbox-classic-headless.log`.
+
+Verified RP2350 bootloader identity on I:, flashed OLED image and observed COM10 return. Initial diagnostics show the existing saved BLE mode, not a completed Classic connection. User was asked to reboot holding GP12, verify XB-BT, then pair BTPad-Xbox-Classic. Classic Windows XInput/Guide/reconnect, MiSTer and XP acceptance remain pending. No console compatibility is inferred.
+
+### Classic Windows hardware follow-up
+
+User confirms it is synced. Live serial changed from an initial pairing failure (0x05) to success (0x00), then remained connected with sync automatically off. Windows lists BTPad-Xbox-Classic and a healthy Bluetooth XINPUT compatible input device at the board's address, with BTHENUM HID service and 045E:02E0 identity. The old BLE records remain separately installed.
+
+Native XInput test observed Player 1 / slot 0, multiple button press/releases, LT=255/RT=0 and LT=0/RT=255 with no button bits in those isolated trigger samples. Neutral returns were observed. The capture did not establish all D-pad directions, simultaneous triggers, Guide behavior, reconnect after power cycling, MiSTer or XP support. Logs: `.build/xbox-classic-first-connection.log`, `.build/xbox-classic-xinput-inputs.log`.

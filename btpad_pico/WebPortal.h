@@ -132,7 +132,7 @@ String htmlPage(uint8_t editProfile) {
   page += "<form method=post action=/save>" + csrfField(sessionCsrf);
   page += "<input type=hidden name=profile value='" + String(editProfile) + "'>";
   page += "<label>Default mode<select name=mode>";
-  for (uint8_t i = 0; i <= MODE_XBOX_BLE; ++i) {
+  for (uint8_t i = 0; i <= MODE_XBOX_CLASSIC; ++i) {
     if (!isSelectableMode(static_cast<HidMode>(i))) continue;
     page += "<option value='" + String(i) + "'" + (i == config.defaultMode ? " selected" : "") + ">" + MODE_NAMES[i] + "</option>";
   }
@@ -269,7 +269,7 @@ void startWebConfig() {
     if (!requireWrite()) return;
     Config candidate = config;
     uint8_t mode = 0, profileId = 0, turbo = 0, socd = 0;
-    if (!parseNumber(server.arg("mode"), MODE_XBOX_BLE, mode) ||
+    if (!parseNumber(server.arg("mode"), MODE_XBOX_CLASSIC, mode) ||
         !parseNumber(server.arg("profile"), 2, profileId) || !profileExists(config, profileId) ||
         !parseNumber(server.arg("turbo"), 30, turbo) || turbo < 2 ||
         !parseNumber(server.arg("socd"), SOCD_LAST_INPUT, socd) ||

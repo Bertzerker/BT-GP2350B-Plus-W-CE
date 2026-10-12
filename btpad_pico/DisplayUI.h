@@ -5,15 +5,15 @@
 // Physical inputs are shown so remaps, SOCD and sync holds remain observable.
 template<class Screen>
 void drawControllerDisplay(Screen &screen, const Config &settings, HidMode mode,
-                           uint32_t physical, bool syncing, bool connected) {
+                           uint32_t physical, bool syncing, bool connected, uint8_t player = 0) {
   screen.clearDisplay();
   screen.setTextSize(1);
   screen.setTextWrap(false);
   screen.setTextColor(1);
   screen.setCursor(0, 0);
   screen.print(mode == MODE_WEB ? "SETUP" : mode == MODE_KEYBOARD ? "HID-KB" :
-               mode == MODE_PS3 ? "PS3-USB" : mode == MODE_DIRECTINPUT ? "DINPUT" : mode == MODE_XBOX_BLE ? "XB-BLE" : "GEN-HID");
-  screen.setCursor(80, 0);
+               mode == MODE_PS3 ? "PS3-USB" : mode == MODE_DIRECTINPUT ? "DINPUT" : mode == MODE_XBOX_BLE ? "XB-BLE" : mode == MODE_XBOX_CLASSIC ? "XB-BT" : "GEN-HID");
+  screen.setCursor(74, 0);
   screen.print(mode == MODE_WEB ? "WI-FI" : mode == MODE_PS3 ? (connected ? "USB:ON" : "USB:WAIT") : connected ? "BT:ON" : syncing ? "BT:SYNC" : "BT:WAIT");
   if (mode == MODE_WEB) {
     screen.setCursor(0, 14); screen.print("BTPad-Setup");
@@ -24,8 +24,11 @@ void drawControllerDisplay(Screen &screen, const Config &settings, HidMode mode,
   }
   const Profile &profile = settings.profiles[settings.activeProfile];
   screen.setCursor(0, 10);
-  screen.print("P"); screen.print(settings.activeProfile + 1); screen.print(" ");
-  for (uint8_t i = 0; i < 18 && profile.name[i]; ++i) screen.print(profile.name[i]);
+  for (uint8_t i = 0; i < 12 && profile.name[i]; ++i) screen.print(profile.name[i]);
+  screen.setCursor(74, 10);
+  screen.print("Player: ");
+  if (connected && player >= 1 && player <= 7) screen.print(player);
+  else screen.print("?"); // Never invent a host slot from the profile or connection order.
 
   const InputId directions[] = {IN_UP, IN_LEFT, IN_RIGHT, IN_DOWN};
   const int dx[] = {14, 4, 24, 14}, dy[] = {20, 29, 29, 38};

@@ -20,7 +20,9 @@ public:
       if (!comboConsumed) {
         Profile &profile = config.profiles[config.activeProfile];
         if (special) {
-          if (eligible[IN_UP] || eligible[IN_DOWN]) {
+          if (eligible[IN_GUIDE]) {
+            reconnectPending = comboConsumed = true;
+          } else if (eligible[IN_UP] || eligible[IN_DOWN]) {
             comboConsumed = true;
             if (eligible[IN_UP] && !eligible[IN_DOWN] && profile.turboHz < 30) { ++profile.turboHz; changed = true; }
             if (eligible[IN_DOWN] && !eligible[IN_UP] && profile.turboHz > 2) { --profile.turboHz; changed = true; }
@@ -87,11 +89,17 @@ public:
     return (gated & ~0xFu) | (gated & cleanedDirections & 0xFu);
   }
   bool suppressed(InputId id) const { return blocked[id]; }
+  bool takeReconnect() {
+    bool requested = reconnectPending;
+    reconnectPending = false;
+    return requested;
+  }
 
 private:
   bool keyboardMode = false;
   bool blocked[IN_COUNT] = {};
   bool comboConsumed = false;
+  bool reconnectPending = false;
   bool captureWasDown = false, captureUsed = false, capturePending = false;
   uint8_t trackedProfile = 0xff;
   InputId verticalWinner = IN_COUNT, horizontalWinner = IN_COUNT;

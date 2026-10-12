@@ -2,14 +2,14 @@
 
 // Called under BluetoothLock. The stack's connection list includes pending ACL
 // attempts: never reset its singleton HID state while a connection is in flight.
-void reconnectBluetooth() {
+void reconnectBluetooth(bool linked) {
   static uint32_t lastAttempt = 0;
   static unsigned int nextHost = 0;
   static bool trackingBusy = false;
   static uint32_t busySince = 0;
   BluetoothLock lock;
   const uint32_t now = millis();
-  if (bluetoothSync || PicoBluetoothHID.connected() || hci_get_state() != HCI_STATE_WORKING) {
+  if (bluetoothSync || linked || hci_get_state() != HCI_STATE_WORKING) {
     lastAttempt = now;
     trackingBusy = false;
     return;
